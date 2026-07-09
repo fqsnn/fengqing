@@ -38,6 +38,12 @@ class EvolutionEnginePort(ABC):
         raise NotImplementedError
 
 
+class WebSearchPort(ABC):
+    @abstractmethod
+    async def search(self, query: str) -> list[JsonMap]:
+        raise NotImplementedError
+
+
 class EventStorePort(ABC):
     @abstractmethod
     async def append_event(self, session_id: str, event_type: str, data: JsonMap) -> None:

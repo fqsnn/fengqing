@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=True)
 
 from .api.routes import get_router
 from .core.agent import CodeAgent
@@ -18,6 +18,7 @@ from .infrastructure.evolution_adapter import EvolutionEngine
 from .infrastructure.llm_adapter import build_llm_adapter
 from .infrastructure.memory_adapter import InMemoryMemoryAdapter
 from .infrastructure.reflection_adapter import SelfReflectionEngine
+from .infrastructure.web_search_adapter import build_web_search_adapter
 
 logging.basicConfig(level=logging.INFO)
 
@@ -31,8 +32,11 @@ reflection = SelfReflectionEngine(llm)
 evolution = EvolutionEngine(SYSTEM_PROMPT)
 event_store = FileEventStore(BASE_DIR / "event_logs")
 shared_context = SharedContext(limit=8)
+web_search = build_web_search_adapter()
 
-service = AICoreService(llm, memory, reflection, evolution, event_store, system_prompt=SYSTEM_PROMPT, shared_context=shared_context)
+service = AICoreService(
+    llm, memory, reflection, evolution, event_store, system_prompt=SYSTEM_PROMPT, shared_context=shared_context, web_search=web_search
+)
 code_agent = CodeAgent(llm, BASE_DIR)
 orchestrator = HybridOrchestrator(llm, code_agent, shared_context=shared_context)
 

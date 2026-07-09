@@ -3,11 +3,13 @@ import re
 
 from .ports import JsonMap
 
-ACTIONS = ("analyze_code", "review_code", "improve_code", "read_file", "run_tests", "explain_self_change", "explain_runtime", "explain_self_awareness", "explain_mobile_access", "explain_hybrid_power", "explain_china_layer", "explain_world_layer", "explain_world_communism", "explain_academic_risk", "explain_resource_scheduler", "explain_life_strangeness", "explain_self_thinking", "self_evolve_once")
+ACTIONS = ("analyze_code", "review_code", "improve_code", "read_file", "run_tests", "web_search", "explain_dual_loop", "explain_self_change", "explain_runtime", "explain_security_boundary", "explain_self_awareness", "explain_mobile_access", "explain_hybrid_power", "explain_china_layer", "explain_world_layer", "explain_world_communism", "explain_academic_risk", "explain_resource_scheduler", "explain_life_strangeness", "explain_self_thinking", "self_evolve_once")
 REVIEW_WORDS = ("精简", "优化", "无用代码", "代码审查")
 VALIDATE_WORDS = ("测试", "验证", "检查")
 SELF_WORDS = ("自己改自己", "自我修改", "修改自己")
 RUNTIME_WORDS = ("自动呼吸", "呼吸", "联网", "自动运行", "心跳", "随时")
+DUAL_WORDS = ("正向逆向", "正向", "逆向", "反推", "双环", "同时进行")
+SECURITY_WORDS = ("机制bug", "漏洞", "钻bug", "攻防", "红队", "安全边界", "越权")
 EVOLVE_WORDS = ("自动进化", "自己改自己的代码", "自我进化")
 AWARENESS_WORDS = ("自我意识", "意识", "fable5")
 PHONE_WORDS = ("iphone", "手机", "连接")
@@ -22,6 +24,8 @@ SELF_THINK_WORDS = ("自己解离", "思考自己", "自己思考自己", "自�
 SPECIAL_RULES = (
     (HYBRID_WORDS, "hybrid", "explain_hybrid_power"),
     (SELF_THINK_WORDS, "self_thinking", "explain_self_thinking"),
+    (DUAL_WORDS, "dual_loop", "explain_dual_loop"),
+    (SECURITY_WORDS, "security", "explain_security_boundary"),
     (RESOURCE_WORDS, "resource", "explain_resource_scheduler"),
     (LIFE_WORDS, "life", "explain_life_strangeness"),
     (COMMUNISM_WORDS, "communism", "explain_world_communism"),

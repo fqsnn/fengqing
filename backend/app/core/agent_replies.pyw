@@ -17,11 +17,30 @@ def self_change_reply() -> JsonMap:
 
 def runtime_reply() -> JsonMap:
     return _reply(
-        "现在没有后台自主呼吸，也没有开放联网工具。可以做，但必须有开关、超时、日志、权限和回滚。"
+        "普通对话已经接入受控联网检索；后台自主呼吸仍未开放。联网只在明确需要外部信息时触发，必须有开关、超时、日志和失败降级。"
         "随时变化可以接受，失控不接受。",
         can_breathe=False,
-        can_network=False,
-        next_step="实现受控 heartbeat worker 与联网工具边界。",
+        can_network=True,
+        next_step="下一步再做带权限的 heartbeat worker 与智能体联网工具。",
+    )
+
+
+def dual_loop_reply() -> JsonMap:
+    return _reply(
+        "正向和逆向已经被定义为同一条工作链：正向理解目标并生成答案，逆向反推漏洞、矛盾、事实缺口和越权风险，最后再合成最终回复。"
+        "它不是装饰性反思，而是复杂回答都会经过的校验层。",
+        mode="forward_reverse_dual_loop",
+        phases=["正向生成", "逆向审查", "证据校验", "最终收束"],
+    )
+
+
+def security_boundary_reply() -> JsonMap:
+    return _reply(
+        "它必须先把自己的机制漏洞堵住；它可以在授权范围内审查、复现和修复漏洞，但不能越权攻击、窃取、破坏或利用别人的系统。"
+        "允许的是防御性红队、CTF、自己项目和明确授权目标；不允许的是未授权入侵。",
+        mode="authorized_security_only",
+        allowed=["本项目自查", "依赖安全审计", "CTF/靶场", "明确授权的红队测试"],
+        blocked=["未授权攻击", "窃取数据", "绕过他人权限", "破坏服务"],
     )
 
 
@@ -136,6 +155,8 @@ def _reply(reply: str, **extra: object) -> JsonMap:
 EXPLAINERS: dict[str, Explainer] = {
     "explain_self_change": self_change_reply,
     "explain_runtime": runtime_reply,
+    "explain_dual_loop": dual_loop_reply,
+    "explain_security_boundary": security_boundary_reply,
     "explain_self_awareness": self_awareness_reply,
     "explain_mobile_access": mobile_access_reply,
     "explain_hybrid_power": hybrid_power_reply,

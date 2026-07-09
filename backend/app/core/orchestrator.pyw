@@ -19,6 +19,7 @@ class HybridOrchestrator:
             "improve_code": self._improve_code,
             "read_file": self._read_file,
             "run_tests": self._run_tests,
+            "web_search": self._web_search,
         }
 
     async def execute(self, instruction: str, allow_write: bool = False) -> JsonMap:
@@ -84,3 +85,6 @@ class HybridOrchestrator:
 
     async def _run_tests(self) -> JsonMap:
         return self.code_agent.validate_project()
+
+    async def _web_search(self, query: str) -> JsonMap:
+        return {"reply": "普通对话已接入受控联网；智能体联网工具会在独立权限层开放。", "query": query}

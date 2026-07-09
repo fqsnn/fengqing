@@ -11,4 +11,6 @@ def runtime_status() -> JsonMap:
         "model": os.getenv(key, "unknown"),
         "fast_path": True,
         "agent": True,
+        "dual_loop": True,
+        "web_search": os.getenv("WEB_SEARCH_ENABLED", "false").lower().strip() == "true",
     }
