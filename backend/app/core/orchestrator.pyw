@@ -2,9 +2,11 @@ from collections.abc import Awaitable, Callable
 
 from .agent import CodeAgent
 from .agent_replies import EXPLAINERS
+from .command_runner import run_quality_commands
 from .evolution_flow import controlled_self_evolution
 from .planner import ACTIONS, direct_plan, parse_plan
 from .ports import JsonMap, LLMEnginePort
+from .self_programming import self_program_once
 from .shared_context import SharedContext
 
 
@@ -14,11 +16,9 @@ class HybridOrchestrator:
         self.code_agent = code_agent
         self.shared_context = shared_context
         self.registry: dict[str, Callable[..., Awaitable[object]]] = {
-            "analyze_code": self._analyze_code,
-            "review_code": self._review_code,
-            "improve_code": self._improve_code,
-            "read_file": self._read_file,
-            "run_tests": self._run_tests,
+            "analyze_code": self._analyze_code, "review_code": self._review_code,
+            "improve_code": self._improve_code, "read_file": self._read_file,
+            "run_tests": self._run_tests, "run_quality_commands": self._run_quality_commands,
             "web_search": self._web_search,
         }
 
@@ -50,6 +50,8 @@ class HybridOrchestrator:
             return EXPLAINERS[action](**params)
         if action == "self_evolve_once":
             return await controlled_self_evolution(self.code_agent, allow_write, int(params.get("max_files", 1)))
+        if action == "self_program_once":
+            return await self_program_once(self.code_agent, allow_write, str(params.get("instruction", "")), int(params.get("max_files", 1)))
         if action not in self.registry:
             return {"error": f"Unknown action: {action}"}
         try:
@@ -66,7 +68,7 @@ class HybridOrchestrator:
         return params
 
     def _summary(self, instruction: str, output: JsonMap) -> str:
-        return f"任务：{instruction}\n结果：{str(output)[:800]}"
+        return f"\u4efb\u52a1\uff1a{instruction}\n\u7ed3\u679c\uff1a{str(output)[:800]}"
 
     async def _analyze_code(self) -> JsonMap:
         return self.code_agent.analyze_project()
@@ -86,5 +88,9 @@ class HybridOrchestrator:
     async def _run_tests(self) -> JsonMap:
         return self.code_agent.validate_project()
 
+    async def _run_quality_commands(self) -> JsonMap:
+        return await run_quality_commands()
+
     async def _web_search(self, query: str) -> JsonMap:
-        return {"reply": "普通对话已接入受控联网；智能体联网工具会在独立权限层开放。", "query": query}
+        reply = "\u666e\u901a\u5bf9\u8bdd\u5df2\u63a5\u5165\u53d7\u63a7\u8054\u7f51\uff1b\u667a\u80fd\u4f53\u8054\u7f51\u5de5\u5177\u4f1a\u5728\u72ec\u7acb\u6743\u9650\u5c42\u5f00\u653e\u3002"
+        return {"reply": reply, "query": query}

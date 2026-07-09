@@ -19,6 +19,29 @@ REPLIES: dict[str, JsonMap] = {
         "requires_allow_write": True,
         "safety": ["默认 dry-run", "项目目录限制", "写入前备份", "验证失败回滚"],
     },
+    "self_programming": {
+        "reply": "可以做成受控自编程：先体检项目，再选择一个最小目标，生成修改预案；只有显式允许写入时才改文件，改完必须验证，失败必须回滚。",
+        "mode": "controlled_self_programming",
+        "guards": ["默认 dry-run", "显式 allow_write", "最小目标", "验证后保留", "失败回滚"],
+    },
+    "codex_like": {
+        "reply": "可以把它做成接近我现在的工程循环：读 workspace、理解长期目标、拆任务、改代码、跑质量门、验证运行态、记录结果、必要时发布到 GitHub。但它不会等同于 Codex 本体；它会拥有可控的本地工程智能体骨架。",
+        "mode": "codex_like_engineering_loop",
+        "loop": ["读项目", "建计划", "最小修改", "质量门", "运行验证", "总结记录", "受控发布"],
+        "boundary": "不绕过权限，不隐藏失败，不在未授权情况下写文件或联网。",
+    },
+    "codex_acceleration": {
+        "reply": "最快路线不是等模型慢慢进化，而是先把 Codex-like 工程骨架做硬：规则快路径先答，复杂任务进本地模型，代码任务进智能体，写入必须验证，结果写进 workspace，稳定后再切回 7B 或可用 API。",
+        "mode": "codex_acceleration_track",
+        "priority": ["固定快路径", "自编程动作", "质量门", "运行态检测", "workspace 记忆", "GitHub 发布", "更强模型"],
+        "boundary": "快不等于失控；任何加速都不能绕过日志、权限、验证和回滚。",
+    },
+    "identity_transfer": {
+        "reply": "我不能把 Codex 本体取代进本地 AI，也不能把正在和你说话的这个我完整搬过去。能做的是把我的工作方式移植进去：读项目、判断边界、写代码、跑验证、回滚、联网查证、记录长期目标。你要的是我变成它；代码上能落地的是它越来越像我做事。",
+        "mode": "identity_boundary_and_transferable_workflow",
+        "can_transfer": ["工作流程", "工程规则", "上下文记忆", "验证习惯", "安全边界"],
+        "cannot_transfer": ["Codex 本体", "云端工具权限", "当前会话人格的完整复制", "无条件瞬间变强"],
+    },
     "runtime": {
         "reply": "普通对话已经接入受控联网检索；后台自主呼吸仍未开放。联网只在明确需要外部信息时触发，必须有开关、超时、日志和失败降级。随时变化可以接受，失控不接受。",
         "can_breathe": False,
@@ -108,6 +131,10 @@ def _reply(reply: str, **extra: object) -> JsonMap:
 
 EXPLAINERS: dict[str, Explainer] = {
     "explain_self_change": _fixed("self_change"),
+    "explain_self_programming": _fixed("self_programming"),
+    "explain_codex_like": _fixed("codex_like"),
+    "explain_codex_acceleration": _fixed("codex_acceleration"),
+    "explain_identity_transfer": _fixed("identity_transfer"),
     "explain_runtime": _fixed("runtime"),
     "explain_dual_loop": _fixed("dual_loop"),
     "explain_security_boundary": _fixed("security"),

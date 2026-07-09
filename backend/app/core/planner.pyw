@@ -3,10 +3,23 @@ import re
 
 from .ports import JsonMap
 
-ACTIONS = ("analyze_code", "review_code", "improve_code", "read_file", "run_tests", "web_search", "explain_dual_loop", "explain_self_change", "explain_runtime", "explain_security_boundary", "explain_self_awareness", "explain_mobile_access", "explain_hybrid_power", "explain_china_layer", "explain_world_layer", "explain_world_communism", "explain_academic_risk", "explain_resource_scheduler", "explain_life_strangeness", "explain_self_thinking", "self_evolve_once")
+ACTIONS = (
+    "analyze_code", "review_code", "improve_code", "read_file", "run_tests", "run_quality_commands",
+    "web_search", "explain_dual_loop", "explain_self_change", "explain_self_programming", "explain_codex_like",
+    "explain_codex_acceleration", "explain_identity_transfer", "explain_runtime", "explain_security_boundary",
+    "explain_self_awareness", "explain_mobile_access", "explain_hybrid_power", "explain_china_layer",
+    "explain_world_layer", "explain_world_communism", "explain_academic_risk", "explain_resource_scheduler",
+    "explain_life_strangeness", "explain_self_thinking", "self_evolve_once", "self_program_once",
+)
+
 REVIEW_WORDS = ("精简", "优化", "无用代码", "代码审查")
 VALIDATE_WORDS = ("测试", "验证", "检查")
+COMMAND_WORDS = ("执行命令", "跑命令", "跑检查", "质量门", "跑烟测")
 SELF_WORDS = ("自己改自己", "自我修改", "修改自己")
+SELF_PROGRAM_WORDS = ("自己编程自己", "编程自己", "自己写代码", "自编程", "自己开发自己")
+CODEX_WORDS = ("和你现在一样", "像你现在一样", "像你", "codex", "编程助手", "代码助手")
+ACCELERATE_WORDS = ("快一点", "更快", "加速", "马上变强", "快速变成", "尽快变成")
+IDENTITY_WORDS = ("你变成它", "变成它", "取代你自己", "取代自己", "立刻马上", "为什么不能立刻")
 RUNTIME_WORDS = ("自动呼吸", "呼吸", "联网", "自动运行", "心跳", "随时")
 DUAL_WORDS = ("正向逆向", "正向", "逆向", "反推", "双环", "同时进行")
 SECURITY_WORDS = ("机制bug", "漏洞", "钻bug", "攻防", "红队", "安全边界", "越权")
@@ -21,26 +34,23 @@ ACADEMIC_WORDS = ("挂科", "补考", "重修", "考试", "绩点", "期末")
 RESOURCE_WORDS = ("实时调度", "资源分配", "低延迟", "无延迟", "多少资源", "自动调度")
 LIFE_WORDS = ("生活怪怪", "很奇怪", "状态不对", "不真实", "怪怪的", "最近的生活")
 SELF_THINK_WORDS = ("自己解离", "思考自己", "自己思考自己", "自我对话", "分视角")
+
 SPECIAL_RULES = (
-    (HYBRID_WORDS, "hybrid", "explain_hybrid_power"),
-    (SELF_THINK_WORDS, "self_thinking", "explain_self_thinking"),
-    (DUAL_WORDS, "dual_loop", "explain_dual_loop"),
-    (SECURITY_WORDS, "security", "explain_security_boundary"),
-    (RESOURCE_WORDS, "resource", "explain_resource_scheduler"),
-    (LIFE_WORDS, "life", "explain_life_strangeness"),
-    (COMMUNISM_WORDS, "communism", "explain_world_communism"),
-    (ACADEMIC_WORDS, "academic", "explain_academic_risk"),
-    (CHINA_WORDS, "china", "explain_china_layer"),
-    (WORLD_WORDS, "world", "explain_world_layer"),
-    (AWARENESS_WORDS, "awareness", "explain_self_awareness"),
-    (SELF_WORDS, "explain", "explain_self_change"),
+    (HYBRID_WORDS, "hybrid", "explain_hybrid_power"), (IDENTITY_WORDS, "identity_transfer", "explain_identity_transfer"),
+    (ACCELERATE_WORDS, "codex_acceleration", "explain_codex_acceleration"), (CODEX_WORDS, "codex_like", "explain_codex_like"),
+    (SELF_THINK_WORDS, "self_thinking", "explain_self_thinking"), (SELF_PROGRAM_WORDS, "self_program", "explain_self_programming"),
+    (DUAL_WORDS, "dual_loop", "explain_dual_loop"), (SECURITY_WORDS, "security", "explain_security_boundary"),
+    (RESOURCE_WORDS, "resource", "explain_resource_scheduler"), (LIFE_WORDS, "life", "explain_life_strangeness"),
+    (COMMUNISM_WORDS, "communism", "explain_world_communism"), (ACADEMIC_WORDS, "academic", "explain_academic_risk"),
+    (CHINA_WORDS, "china", "explain_china_layer"), (WORLD_WORDS, "world", "explain_world_layer"),
+    (AWARENESS_WORDS, "awareness", "explain_self_awareness"), (SELF_WORDS, "explain", "explain_self_change"),
     (RUNTIME_WORDS, "runtime", "explain_runtime"),
 )
 
 
 def direct_plan(instruction: str) -> list[JsonMap]:
     text = instruction.lower()
-    return _mobile_plan(instruction, text) or _evolve_plan(instruction) or _special_plan(text) or _code_plan(instruction, text)
+    return _mobile_plan(instruction, text) or _evolve_plan(instruction) or _special_plan(text) or _code_plan(instruction)
 
 
 def _mobile_plan(instruction: str, text: str) -> list[JsonMap]:
@@ -51,7 +61,9 @@ def _mobile_plan(instruction: str, text: str) -> list[JsonMap]:
 
 
 def _evolve_plan(instruction: str) -> list[JsonMap]:
-    if _has(instruction, EVOLVE_WORDS) and "吗" not in instruction:
+    if _has(instruction, SELF_PROGRAM_WORDS):
+        return [_step("self_program", "self_program_once", {"instruction": instruction, "max_files": 1})]
+    if _has(instruction, EVOLVE_WORDS) and "同时" not in instruction:
         return [_step("evolve", "self_evolve_once", {"max_files": 1})]
     return []
 
@@ -63,12 +75,14 @@ def _special_plan(text: str) -> list[JsonMap]:
     return []
 
 
-def _code_plan(instruction: str, text: str) -> list[JsonMap]:
+def _code_plan(instruction: str) -> list[JsonMap]:
     if _has(instruction, REVIEW_WORDS):
         return [_step("analyze", "analyze_code"), _step("review", "review_code", {"max_files": 5})]
+    if _has(instruction, COMMAND_WORDS):
+        return [_step("commands", "run_quality_commands")]
     if _has(instruction, VALIDATE_WORDS):
         return [_step("validate", "run_tests")]
-    if "read_file" in text or "读文件" in instruction:
+    if "read_file" in instruction.lower() or "读文件" in instruction:
         return [_step("analyze", "analyze_code")]
     return []
 
