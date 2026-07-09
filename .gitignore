@@ -1,0 +1,33 @@
+.venv/
+.venv*/
+venv/
+venv*/
+__pycache__/
+*.py[cod]
+*.pyo
+
+.env
+event_logs/
+backend/event_logs/
+backend/.backup/
+
+*.log
+*.tmp
+
+# Local packaged app/runtime artifacts
+*.exe
+*.dll
+*.pak
+*.bin
+*.dat
+resources/
+locales/
+LICENSES.chromium.html
+vk_swiftshader_icd.json
+version
+
+# Editor/system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

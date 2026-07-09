@@ -1,0 +1,18 @@
+quality:
+  max_file_lines: 80
+  max_function_lines: 15
+  max_public_methods: 5
+  max_dependencies: 8
+
+source_roots:
+  - app
+  - tools
+  - ../desktop
+
+hardcoded_markers:
+  - E:\
+  - E:/
+  - 127.0.0.1
+  - localhost
+  - http://
+  - https://
