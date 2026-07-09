@@ -1,4 +1,5 @@
 from .entities import Conversation, Reflection
+from .conversation_style import natural_reply, polish_reply
 from .dual_loop import DUAL_LOOP_SYSTEM, format_search_context, needs_web_search
 from .ports import EventStorePort, EvolutionEnginePort, LLMEnginePort, ReflectionEnginePort, ShortTermMemoryPort, WebSearchPort
 from .prompts import DEFAULT_SYSTEM_PROMPT
@@ -33,21 +34,29 @@ class AICoreService:
     async def process_user_input(self, session_id: str, user_input: str) -> str:
         conv = await self._conversation(session_id)
         conv.add_message("user", user_input)
-        quick = quick_reply(user_input)
-        if quick and not needs_web_search(user_input):
-            await self._save_answer(session_id, conv, user_input, quick)
-            await self.event_store.append_event(session_id, "FAST_REPLY", {"reply": quick})
-            return quick
+        fast = await self._fast_reply(session_id, conv, user_input)
+        if fast:
+            return fast
         try:
             return await self._model_reply(session_id, conv, user_input)
         except Exception as exc:
             return await self._llm_failure(session_id, conv, user_input, exc)
 
+    async def _fast_reply(self, session_id: str, conv: Conversation, user_input: str) -> str:
+        if needs_web_search(user_input):
+            return ""
+        for event_type, reply in (("NATURAL_REPLY", natural_reply(user_input, conv)), ("FAST_REPLY", quick_reply(user_input))):
+            if reply:
+                await self._save_answer(session_id, conv, user_input, reply)
+                await self.event_store.append_event(session_id, event_type, {"reply": reply})
+                return reply
+        return ""
+
     async def _model_reply(self, session_id: str, conv: Conversation, user_input: str) -> str:
         raw = await self._draft(session_id, conv, user_input)
         reflection = await self._reflect(conv, user_input, raw)
         await self._record_reflection(session_id, raw, reflection)
-        final = reflection.revised_response or raw
+        final = polish_reply(user_input, reflection.revised_response or raw, conv)
         await self._save_answer(session_id, conv, user_input, final)
         await self._maybe_evolve(session_id, reflection)
         return final
