@@ -1,10 +1,10 @@
 from collections.abc import Awaitable, Callable
 
 from .agent import CodeAgent
+from .agent_replies import EXPLAINERS
 from .evolution_flow import controlled_self_evolution
 from .planner import ACTIONS, direct_plan, parse_plan
 from .ports import JsonMap, LLMEnginePort
-from .reply_registry import EXPLAINERS
 from .shared_context import SharedContext
 
 

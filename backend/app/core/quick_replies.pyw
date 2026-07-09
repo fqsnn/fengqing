@@ -1,5 +1,5 @@
+from .agent_replies import EXPLAINERS
 from .planner import direct_plan
-from .reply_registry import EXPLAINERS
 
 
 def quick_reply(instruction: str) -> str | None:

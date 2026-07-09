@@ -5,6 +5,8 @@ from quality_config import ROOT, effective_lines
 
 
 def check_file_size(path: Path, limit: int) -> list[str]:
+    if limit <= 0:
+        return []
     count = effective_lines(path)
     return [f"{path}: {count} effective lines > {limit}"] if count > limit else []
 

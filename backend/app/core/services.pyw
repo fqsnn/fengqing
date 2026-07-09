@@ -2,7 +2,6 @@ from .entities import Conversation, Reflection
 from .ports import EventStorePort, EvolutionEnginePort, LLMEnginePort, ReflectionEnginePort, ShortTermMemoryPort
 from .prompts import DEFAULT_SYSTEM_PROMPT
 from .quick_replies import quick_reply
-from .service_events import reflection_event
 from .shared_context import SharedContext
 
 
@@ -63,7 +62,7 @@ class AICoreService:
         return await self.reflection.reflect(user_input, raw, history)
 
     async def _record_reflection(self, session_id: str, raw: str, reflection: Reflection) -> None:
-        await self.event_store.append_event(session_id, "REFLECTION", reflection_event(raw, reflection))
+        await self.event_store.append_event(session_id, "REFLECTION", self._reflection_event(raw, reflection))
 
     async def _save_answer(self, session_id: str, conv: Conversation, user_input: str, final: str) -> None:
         conv.add_message("assistant", final)
@@ -80,6 +79,15 @@ class AICoreService:
 
     def _average_confidence(self, reflections: list[Reflection]) -> float:
         return sum(item.confidence for item in reflections) / len(reflections)
+
+    def _reflection_event(self, raw: str, reflection: Reflection) -> dict[str, object]:
+        return {
+            "original": raw,
+            "revised": reflection.revised_response,
+            "confidence": reflection.confidence,
+            "contradictions": reflection.contradictions,
+            "inner_monologue": reflection.inner_monologue,
+        }
 
     async def _apply_evolution(self, session_id: str, reflections: list[Reflection]) -> None:
         new_prompt = await self.evolution.mutate(reflections)

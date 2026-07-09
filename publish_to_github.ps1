@@ -46,6 +46,7 @@ print("compiled", len(files))
     if ($LASTEXITCODE -ne 0) {
       throw "python compile check failed"
     }
+    Invoke-Checked -Tool $python -ToolArgs @("-m", "tools.smoke_test")
   } finally {
     Pop-Location
   }

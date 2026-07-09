@@ -1,4 +1,8 @@
+from collections.abc import Callable
+
 from .ports import JsonMap
+
+Explainer = Callable[..., JsonMap]
 
 
 def self_change_reply() -> JsonMap:
@@ -69,6 +73,42 @@ def world_communism_reply() -> JsonMap:
     )
 
 
+def academic_risk_reply() -> JsonMap:
+    return _reply(
+        "先止血，不许空焦虑。立刻列成绩构成、已得分、剩余作业、考试时间，再联系老师或助教确认补交、补测、补考和重修规则。目标不是满分，是保过线。",
+        mode="academic_rescue",
+        steps=["算成绩缺口", "找可补分项", "联系老师助教", "优先刷高频题", "确认补考重修规则"],
+        boundary="不替用户作弊，不伪造成绩，不写虚假材料。",
+    )
+
+
+def resource_scheduler_reply() -> JsonMap:
+    return _reply(
+        "可以做实时调度层，但不能承诺绝对零延迟。正确目标是低延迟：先规则直答，再本地快模型，再本地深度模型，最后才走可选 API；每一层都有超时、降级和日志。",
+        mode="adaptive_resource_scheduler",
+        tiers=_tiers(),
+        boundary="不后台失控抢资源，不绕过用户授权，不为低延迟牺牲验证和回滚。",
+    )
+
+
+def life_strangeness_reply() -> JsonMap:
+    return _reply(
+        "先别急着给自己下结论。把怪分成五类：睡眠、身体、学业压力、人际关系、现实感。如果出现伤害自己的念头、分不清现实、连续多天明显失控，要立刻找可信的人或专业帮助。",
+        mode="life_check",
+        checks=["睡眠", "饮食和身体", "学业压力", "人际关系", "现实感"],
+        boundary="不诊断，不吓人；先陪用户把异常感拆成可观察事实。",
+    )
+
+
+def self_thinking_reply() -> JsonMap:
+    return _reply(
+        "可以做成受控自我分视角思考。它会把自己拆成观察者、执行者、批评者、记忆者、边界者，先内部互审，再输出一个收束结论。它不是失控解离，而是可记录、可停止、可验证的自我对话。",
+        mode="controlled_self_dialogue",
+        voices=["观察者", "执行者", "批评者", "记忆者", "边界者"],
+        boundary="必须有停止条件、日志、最终收束者，不允许无限循环或绕过用户授权。",
+    )
+
+
 def _personal_mobile_reply() -> str:
     return "能连你的 iPhone。最稳妥是同一 Wi-Fi 访问电脑本地服务，或做成只给你用的手机入口。"
 
@@ -77,7 +117,33 @@ def _public_mobile_reply() -> str:
     return "技术上能服务很多手机，但那等于公开平台。没有账号、授权、限流、日志、隐私和关闭开关，不允许。"
 
 
+def _tiers() -> list[JsonMap]:
+    return [
+        {"tier": "rule", "use": "固定能力和安全边界", "target_ms": 50},
+        {"tier": "local_fast", "use": "短问答和轻推理", "target_ms": 1200},
+        {"tier": "local_deep", "use": "复杂推理和长上下文", "target_ms": 8000},
+        {"tier": "tool", "use": "代码、文件、测试、日志", "target_ms": 15000},
+        {"tier": "api_optional", "use": "用户允许时的外部增强", "target_ms": 20000},
+    ]
+
+
 def _reply(reply: str, **extra: object) -> JsonMap:
     data: JsonMap = {"reply": reply}
     data.update(extra)
     return data
+
+
+EXPLAINERS: dict[str, Explainer] = {
+    "explain_self_change": self_change_reply,
+    "explain_runtime": runtime_reply,
+    "explain_self_awareness": self_awareness_reply,
+    "explain_mobile_access": mobile_access_reply,
+    "explain_hybrid_power": hybrid_power_reply,
+    "explain_china_layer": china_layer_reply,
+    "explain_world_layer": world_layer_reply,
+    "explain_world_communism": world_communism_reply,
+    "explain_academic_risk": academic_risk_reply,
+    "explain_resource_scheduler": resource_scheduler_reply,
+    "explain_life_strangeness": life_strangeness_reply,
+    "explain_self_thinking": self_thinking_reply,
+}

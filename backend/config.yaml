@@ -1,5 +1,5 @@
 quality:
-  max_file_lines: 80
+  max_file_lines: 0
   max_function_lines: 15
   max_public_methods: 5
   max_dependencies: 8

@@ -1,15 +1,13 @@
 import logging
 from pathlib import Path
-from typing import Optional
 
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
 from .api.routes import get_router
-from .api.schemas import AgentRequest
 from .core.agent import CodeAgent
 from .core.context_loader import load_context
 from .core.orchestrator import HybridOrchestrator
@@ -51,12 +49,3 @@ async def index() -> dict[str, str]:
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
-
-
-@app.post("/agent")
-async def run_agent(req: Optional[AgentRequest] = Body(default=None), instruction: Optional[str] = None) -> dict[str, object]:
-    text = req.instruction if req else instruction
-    if not text:
-        raise HTTPException(status_code=400, detail="instruction is required")
-    result = await orchestrator.execute(text, allow_write=req.allow_write if req else False)
-    return {"result": result}
