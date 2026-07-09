@@ -29,17 +29,17 @@ function Find-Python {
 
 function Test-Code {
   $python = Find-Python
+  $env:PYTHONDONTWRITEBYTECODE = "1"
   Push-Location (Join-Path $Root "backend")
   try {
     Invoke-Checked -Tool $python -ToolArgs @("tools\quality_gate.py")
     $compile = @'
 from pathlib import Path
-import py_compile
 files = list(Path("app").rglob("*.pyw"))
 files += list(Path("tools").rglob("*.py"))
 files += list(Path("../desktop").rglob("*.pyw"))
 for path in files:
-    py_compile.compile(str(path), doraise=True)
+    compile(path.read_text(encoding="utf-8"), str(path), "exec")
 print("compiled", len(files))
 '@
     $compile | & $python -
