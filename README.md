@@ -28,10 +28,10 @@ python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 在项目根目录运行：
 
 ```bat
-open_ai.bat
+fqsnn.bat
 ```
 
-`open_ai.bat` 会打开原生 Windows 客户端。如果后端没启动，客户端会先启动后端，等待状态接口可用后再进入对话。
+`fqsnn.bat` 会打开原生 Windows 客户端。如果后端没启动，客户端会先启动后端，等待状态接口可用后再进入对话。
 
 ## Windows 系统集成
 

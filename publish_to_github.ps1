@@ -60,7 +60,7 @@ function New-PublishTree {
   try {
     $paths = @(
       ".gitignore", "README.md", "LICENSE",
-      "open_ai.bat", "publish_to_github.bat", "publish_to_github.ps1",
+      "fqsnn.bat", "publish_to_github.bat", "publish_to_github.ps1",
       "install_windows_shortcuts.bat", "install_windows_shortcuts.ps1",
       "uninstall_windows_shortcuts.ps1", "backend/.env.example",
       "backend/requirements.txt", "backend/start.bat", "backend/config.yaml",
