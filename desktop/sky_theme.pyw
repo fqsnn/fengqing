@@ -23,6 +23,8 @@ class SkyHeader(Canvas):
         self._cloud(width * 0.20, 58, 1.08)
         self._cloud(width * 0.78, 78, 0.88)
         self._breeze(width)
+        self._butterfly(width * 0.58, 74, 0.9)
+        self._butterfly(width * 0.68, 44, 0.72)
         self.create_text(28, 42, text="风轻思念浓", anchor="w", fill=INK, font=("Segoe UI", 21, "bold"))
         self.create_text(30, 76, text="fqsnn · morning sky", anchor="w", fill=MUTED, font=("Segoe UI", 10))
 
@@ -51,3 +53,9 @@ class SkyHeader(Canvas):
         lines = [(width * 0.46, 32, 82), (width * 0.52, 48, 112), (width * 0.40, 92, 96)]
         for x, y, span in lines:
             self.create_line(x, y, x + span, y - 4, fill="#d6f1ff", width=2, smooth=True)
+
+    def _butterfly(self, x: float, y: float, scale: float) -> None:
+        wing = "#fff6cf"
+        self.create_oval(x - 14 * scale, y - 9 * scale, x, y + 7 * scale, fill=wing, outline=wing)
+        self.create_oval(x, y - 9 * scale, x + 14 * scale, y + 7 * scale, fill=wing, outline=wing)
+        self.create_line(x, y - 8 * scale, x, y + 9 * scale, fill="#c99948", width=1)
