@@ -20,6 +20,8 @@ def game_coupling_reply() -> JsonMap:
 
 
 def _theme(instruction: str) -> str:
+    if "核心" in instruction:
+        return "AI 核心"
     if "\u5728\u610f" in instruction:
         return "\u5728\u610f\u672c\u8eab"
     if "\u4ee3\u7801" in instruction or "\u7f16\u7a0b" in instruction:

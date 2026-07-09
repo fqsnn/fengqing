@@ -1,6 +1,7 @@
 from collections.abc import Callable
 
 from .game_coupling import game_coupling_reply
+from .ai_core_push import ai_core_push_reply
 from .ports import JsonMap
 from .project_roadmap import next_push_reply
 
@@ -152,4 +153,5 @@ EXPLAINERS: dict[str, Explainer] = {
     "explain_self_thinking": _fixed("self_thinking"),
     "explain_ai_game_coupling": game_coupling_reply,
     "explain_next_push": next_push_reply,
+    "explain_ai_core_push": ai_core_push_reply,
 }
