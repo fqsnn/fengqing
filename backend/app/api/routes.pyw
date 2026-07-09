@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 
 from ..core.orchestrator import HybridOrchestrator
 from ..core.ports import JsonMap
+from ..core.progress_ledger import progress_snapshot
 from ..core.runtime_status import runtime_status
 from ..core.services import AICoreService
 from .schemas import AgentRequest, AgentResponse, ChatRequest, ChatResponse
@@ -34,6 +35,7 @@ class AgentEndpoint:
 def get_router(service: AICoreService, orchestrator: HybridOrchestrator | None = None) -> APIRouter:
     router = APIRouter(prefix="/api/v1")
     router.add_api_route("/status", status_endpoint, methods=["GET"])
+    router.add_api_route("/progress", progress_endpoint, methods=["GET"])
     router.add_api_route("/chat", ChatEndpoint(service).__call__, methods=["POST"], response_model=ChatResponse)
     if orchestrator:
         endpoint = AgentEndpoint(orchestrator).__call__
@@ -43,3 +45,7 @@ def get_router(service: AICoreService, orchestrator: HybridOrchestrator | None =
 
 async def status_endpoint() -> JsonMap:
     return runtime_status()
+
+
+async def progress_endpoint() -> JsonMap:
+    return progress_snapshot()

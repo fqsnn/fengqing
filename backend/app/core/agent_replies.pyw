@@ -4,6 +4,7 @@ from .game_coupling import game_coupling_reply
 from .ai_core_push import ai_core_push_reply
 from .ports import JsonMap
 from .project_roadmap import next_push_reply
+from .progress_ledger import progress_reply
 
 Explainer = Callable[..., JsonMap]
 
@@ -154,4 +155,5 @@ EXPLAINERS: dict[str, Explainer] = {
     "explain_ai_game_coupling": game_coupling_reply,
     "explain_next_push": next_push_reply,
     "explain_ai_core_push": ai_core_push_reply,
+    "explain_visible_progress": progress_reply,
 }

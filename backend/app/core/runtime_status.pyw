@@ -1,6 +1,7 @@
 import os
 
 from .ports import JsonMap
+from .progress_ledger import CURRENT
 
 
 def runtime_status() -> JsonMap:
@@ -13,4 +14,6 @@ def runtime_status() -> JsonMap:
         "agent": True,
         "dual_loop": True,
         "web_search": os.getenv("WEB_SEARCH_ENABLED", "false").lower().strip() == "true",
+        "progress_stage": CURRENT["stage"],
+        "latest_progress": CURRENT["focus"],
     }

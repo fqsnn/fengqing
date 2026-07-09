@@ -17,15 +17,14 @@ class FengqingApp:
         self.allow_write = BooleanVar(value=False)
         self._build()
         self._status()
-        self._say("风轻思念浓", "我在。现在这是原生桌面窗口，不是浏览器页。")
+        self._say("风轻思念浓", "我在。现在推进会显示出来，不再只藏在代码里。")
 
     def run(self) -> None:
         self.root.mainloop()
 
     def _build(self) -> None:
         self.root.configure(bg=SKY)
-        self.header = SkyHeader(self.root)
-        self.header.pack(fill="x")
+        SkyHeader(self.root).pack(fill="x")
         self.status = Label(self.root, text="检查中", bg=SKY, fg=MUTED, font=("Segoe UI", 10))
         self.status.pack(anchor="e", padx=18, pady=(0, 4))
         self.body = Text(self.root, wrap=WORD, bg=CARD, fg=INK, relief="flat", padx=22, pady=18)
@@ -48,11 +47,24 @@ class FengqingApp:
         self.tools.pack(fill="x")
         Button(self.tools, text="对话", command=lambda: self._mode("chat"), bg=CARD, fg=INK, relief="flat").pack(side="left")
         Button(self.tools, text="智能体", command=lambda: self._mode("agent"), bg=CARD, fg=INK, relief="flat").pack(side="left", padx=8)
+        Button(self.tools, text="进度", command=self._show_progress, bg=CARD, fg=INK, relief="flat").pack(side="left", padx=4)
         Checkbutton(self.tools, text="允许写入", variable=self.allow_write, bg=SKY, fg=MUTED).pack(side="left", padx=4)
 
     def _status(self) -> None:
         data = request("GET", "/api/v1/status") or {}
-        self.status.config(text=f"{data.get('provider', 'offline')} · {data.get('model', 'unknown')}")
+        model = f"{data.get('provider', 'offline')} / {data.get('model', 'unknown')}"
+        self.status.config(text=f"{model} | {data.get('progress_stage', '未读取进度')}")
+
+    def _show_progress(self) -> None:
+        data = request("GET", "/api/v1/progress") or {}
+        self._say("进度", self._progress_text(data))
+
+    def _progress_text(self, data: dict[str, object]) -> str:
+        rows = [str(data.get("reply", "暂无进度"))]
+        for item in data.get("milestones", []) if isinstance(data.get("milestones"), list) else []:
+            if isinstance(item, dict):
+                rows.append(f"- {item.get('name')}: {item.get('proof')}")
+        return "\n".join(rows)
 
     def _mode(self, mode: str) -> None:
         self.mode = mode
@@ -66,7 +78,8 @@ class FengqingApp:
             threading.Thread(target=self._send, args=(text,), daemon=True).start()
 
     def _send(self, text: str) -> None:
-        data = request("POST", "/api/v1/agent", self._agent_payload(text)) if self.mode == "agent" else request("POST", "/api/v1/chat", {"session_id": SESSION, "message": text})
+        payload = self._agent_payload(text) if self.mode == "agent" else {"session_id": SESSION, "message": text}
+        data = request("POST", "/api/v1/agent" if self.mode == "agent" else "/api/v1/chat", payload)
         reply = self._agent_text(data) if self.mode == "agent" else str((data or {}).get("reply", "连接中断。"))
         self.root.after(0, lambda: self._say("风轻思念浓", reply))
 
@@ -77,7 +90,15 @@ class FengqingApp:
         result = (data or {}).get("result", {})
         rows = result.get("results", []) if isinstance(result, dict) else []
         first = rows[0].get("result", {}) if rows and isinstance(rows[0], dict) else {}
-        return str(first.get("reply") or first or "智能体已完成任务。")
+        return self._format_agent_result(first if isinstance(first, dict) else {})
+
+    def _format_agent_result(self, result: dict[str, object]) -> str:
+        lines = [str(result.get("reply") or result or "智能体已完成任务。")]
+        if isinstance(result.get("game_project"), dict):
+            lines.append(f"雨城映射：{result['game_project'].get('reply')}")
+        if isinstance(result.get("first_sprint"), dict):
+            lines.append(f"第一步：{result['first_sprint'].get('name')}")
+        return "\n".join(lines)
 
     def _say(self, who: str, text: str) -> None:
         self.body.insert(END, f"{who}\n", "who")
