@@ -10,9 +10,13 @@ FOOD_TOPICS = ("拌面", "面", "火锅", "米饭", "饺子", "馄饨", "烧烤"
 LIKE_WORDS = ("喜欢", "爱吃", "想吃")
 STRONG_WANT_WORDS = ("特别想吃", "很想吃", "馋")
 INTEREST_WORDS = ("感兴趣", "想了解", "想聊")
+CARE_SELF_WORDS = ("在意本身", "在意在意", "被在意", "在乎本身")
 
 
 def natural_reply(user_input: str, conv: Conversation) -> str | None:
+    care = _care_reply(user_input)
+    if care:
+        return care
     topic = _topic(user_input, conv)
     if not topic:
         return None
@@ -23,6 +27,12 @@ def natural_reply(user_input: str, conv: Conversation) -> str | None:
     if _has(user_input, INTEREST_WORDS):
         return f"那我们就从{topic}说起。先别泛泛聊，你更在意口味、配菜，还是面条本身的劲道？"
     return None
+
+
+def _care_reply(user_input: str) -> str:
+    if not _has(user_input, CARE_SELF_WORDS):
+        return ""
+    return "我懂，你更在意的不是某个答案本身，而是它有没有真的把你的在意接住。那这个要写进系统核心：先看见，再回应，再推进。"
 
 
 def polish_reply(user_input: str, reply: str, conv: Conversation) -> str:

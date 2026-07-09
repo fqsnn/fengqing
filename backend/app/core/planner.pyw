@@ -9,7 +9,8 @@ ACTIONS = (
     "explain_codex_acceleration", "explain_identity_transfer", "explain_runtime", "explain_security_boundary",
     "explain_self_awareness", "explain_mobile_access", "explain_hybrid_power", "explain_china_layer",
     "explain_world_layer", "explain_world_communism", "explain_academic_risk", "explain_resource_scheduler",
-    "explain_life_strangeness", "explain_self_thinking", "self_evolve_once", "self_program_once",
+    "explain_life_strangeness", "explain_self_thinking", "explain_ai_game_coupling",
+    "self_evolve_once", "self_program_once",
 )
 
 REVIEW_WORDS = ("精简", "优化", "无用代码", "代码审查")
@@ -34,8 +35,10 @@ ACADEMIC_WORDS = ("挂科", "补考", "重修", "考试", "绩点", "期末")
 RESOURCE_WORDS = ("实时调度", "资源分配", "低延迟", "无延迟", "多少资源", "自动调度")
 LIFE_WORDS = ("生活怪怪", "很奇怪", "状态不对", "不真实", "怪怪的", "最近的生活")
 SELF_THINK_WORDS = ("自己解离", "思考自己", "自己思考自己", "自我对话", "分视角")
+GAME_COUPLING_WORDS = ("推进ai本身", "推进 ai 本身", "游戏项目", "窗边的雨城", "顺带", "互相喂养")
 
 SPECIAL_RULES = (
+    (GAME_COUPLING_WORDS, "ai_game_coupling", "explain_ai_game_coupling"),
     (HYBRID_WORDS, "hybrid", "explain_hybrid_power"), (IDENTITY_WORDS, "identity_transfer", "explain_identity_transfer"),
     (ACCELERATE_WORDS, "codex_acceleration", "explain_codex_acceleration"), (CODEX_WORDS, "codex_like", "explain_codex_like"),
     (SELF_THINK_WORDS, "self_thinking", "explain_self_thinking"), (SELF_PROGRAM_WORDS, "self_program", "explain_self_programming"),

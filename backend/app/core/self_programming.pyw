@@ -3,6 +3,7 @@ from shutil import copy
 
 from .agent import CodeAgent
 from .command_runner import run_quality_commands
+from .game_coupling import game_progress_from_ai
 from .ports import JsonMap
 
 
@@ -24,7 +25,9 @@ def _payload(
     instruction: str, allow_write: bool, before: JsonMap, baseline: JsonMap, target: list[JsonMap],
     items: list[JsonMap], after: JsonMap, commands: JsonMap, rolled_back: list[str],
 ) -> JsonMap:
-    return {"mode": "controlled_self_programming", "reply": _reply(allow_write, target, after, commands, rolled_back), "instruction": instruction, "before": before, "baseline_commands": baseline, "target": target, "items": items, "after": after, "commands": commands, "rolled_back": rolled_back, "guards": _guards()}
+    data = {"mode": "controlled_self_programming", "reply": _reply(allow_write, target, after, commands, rolled_back), "instruction": instruction, "before": before, "baseline_commands": baseline, "target": target, "items": items, "after": after, "commands": commands, "rolled_back": rolled_back, "guards": _guards()}
+    data["game_project"] = game_progress_from_ai(instruction, {"target": target, "commands": commands})
+    return data
 
 
 def _target(analysis: JsonMap, max_files: int) -> list[JsonMap]:
