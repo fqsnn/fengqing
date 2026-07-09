@@ -88,9 +88,19 @@ class FengqingApp:
 
     def _agent_text(self, data: dict[str, object] | None) -> str:
         result = (data or {}).get("result", {})
+        if isinstance(result, dict) and isinstance(result.get("visible_progress"), dict):
+            return self._format_visible_agent(result)
         rows = result.get("results", []) if isinstance(result, dict) else []
         first = rows[0].get("result", {}) if rows and isinstance(rows[0], dict) else {}
         return self._format_agent_result(first if isinstance(first, dict) else {})
+
+    def _format_visible_agent(self, result: dict[str, object]) -> str:
+        visible = result["visible_progress"]
+        lines = [str(visible.get("summary", "")), f"下一步：{visible.get('next', '')}"]
+        for item in visible.get("steps", []) if isinstance(visible.get("steps"), list) else []:
+            if isinstance(item, dict):
+                lines.append(f"- {item.get('action')} / {item.get('status')}: {item.get('evidence')}")
+        return "\n".join(lines)
 
     def _format_agent_result(self, result: dict[str, object]) -> str:
         lines = [str(result.get("reply") or result or "智能体已完成任务。")]

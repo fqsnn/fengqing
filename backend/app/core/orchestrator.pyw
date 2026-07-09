@@ -1,6 +1,7 @@
 from collections.abc import Awaitable, Callable
 
 from .agent import CodeAgent
+from .agent_progress import summarize_agent_progress
 from .agent_replies import EXPLAINERS
 from .command_runner import run_quality_commands
 from .evolution_flow import controlled_self_evolution
@@ -26,6 +27,7 @@ class HybridOrchestrator:
         plan = await self._plan(instruction)
         results = [{"step": step, "result": await self._run_step(step, allow_write)} for step in plan]
         output = {"plan": plan, "results": results, "allow_write": allow_write}
+        output["visible_progress"] = summarize_agent_progress(plan, results, allow_write)
         if self.shared_context:
             self.shared_context.add("agent", self._summary(instruction, output))
         return output

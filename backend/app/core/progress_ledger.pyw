@@ -6,12 +6,13 @@ MILESTONES: list[JsonMap] = [
     {"name": "AI 与雨城共生", "proof": "AI 每次推进都会映射一个雨城产出方向"},
     {"name": "下一步推进器", "proof": "不知道怎么推时，返回每日推进回路"},
     {"name": "AI 核心推进入口", "proof": "核心被拆成理解、记忆、决策、表达四层"},
+    {"name": "智能体执行进度", "proof": "每轮智能体结果会附带可读进度摘要"},
 ]
 
 CURRENT = {
     "stage": "AI 核心第一轮",
     "focus": "让推进变得可见：状态、证据、下一步都能被用户看到",
-    "next": "把每次智能体执行结果显示成可读进度，而不是只显示一句回答",
+    "next": "把真实执行进度沉淀成可查询历史记录",
 }
 
 
@@ -21,7 +22,7 @@ def progress_snapshot() -> JsonMap:
 
 def progress_reply() -> JsonMap:
     data = progress_snapshot()
-    data["answer"] = "你感觉不到推进，是因为系统没有把推进显性化。现在要把进度变成界面和接口里能看见的东西。"
+    data["answer"] = "推进现在不只藏在代码里：状态、证据、下一步都会被显示出来。"
     return data
 
 
