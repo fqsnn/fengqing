@@ -53,6 +53,14 @@ powershell -ExecutionPolicy Bypass -File uninstall_windows_shortcuts.ps1
 
 不要直接推送当前旧 `main` 历史。旧历史曾跟踪过本地环境和打包资源。正式开源应使用干净发布分支，只包含源码、配置样例、启动脚本、README 和 LICENSE。
 
+快速同步到 GitHub：
+
+```bat
+publish_to_github.bat -Message "描述这次修改"
+```
+
+这个脚本会先运行质量检查和编译检查，再按白名单重建 `publish-clean`，扫描密钥、私密内容、本地环境和旧入口，最后才推送到远程 `main`。
+
 ## 手机连接
 
 只给自己的设备在同一 Wi-Fi 下调试连接时，把 `backend/.env` 里的 `APP_HOST` 改成：
