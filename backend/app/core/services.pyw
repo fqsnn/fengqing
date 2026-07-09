@@ -38,6 +38,12 @@ class AICoreService:
             await self._save_answer(session_id, conv, user_input, quick)
             await self.event_store.append_event(session_id, "FAST_REPLY", {"reply": quick})
             return quick
+        try:
+            return await self._model_reply(session_id, conv, user_input)
+        except Exception as exc:
+            return await self._llm_failure(session_id, conv, user_input, exc)
+
+    async def _model_reply(self, session_id: str, conv: Conversation, user_input: str) -> str:
         raw = await self._draft(session_id, conv, user_input)
         reflection = await self._reflect(conv, user_input, raw)
         await self._record_reflection(session_id, raw, reflection)
@@ -45,6 +51,12 @@ class AICoreService:
         await self._save_answer(session_id, conv, user_input, final)
         await self._maybe_evolve(session_id, reflection)
         return final
+
+    async def _llm_failure(self, session_id: str, conv: Conversation, user_input: str, exc: Exception) -> str:
+        reply = "本地模型暂时不可用，连接没有断；后端仍在运行。请确认 Ollama 已下载并可运行当前模型。"
+        await self.event_store.append_event(session_id, "LLM_FAILED", {"error": str(exc)})
+        await self._save_answer(session_id, conv, user_input, reply)
+        return reply
 
     def _llm_messages(self, conv: Conversation, web_context: str) -> list[dict[str, str]]:
         messages = conv.to_llm_format()
