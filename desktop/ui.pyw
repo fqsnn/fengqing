@@ -3,6 +3,7 @@ import time
 from tkinter import BooleanVar, Button, Checkbutton, Entry, Frame, Label, Tk, Text, END, WORD
 
 from backend_bridge import request
+from sky_theme import BLUE, CARD, INK, MUTED, SKY, SkyHeader
 
 SESSION = f"desktop_{int(time.time())}"
 
@@ -22,31 +23,32 @@ class FengqingApp:
         self.root.mainloop()
 
     def _build(self) -> None:
-        self.root.configure(bg="#f5f5f7")
-        self.top = Frame(self.root, bg="#ffffff", padx=16, pady=12)
-        self.top.pack(fill="x")
-        Label(self.top, text="风轻思念浓", bg="#ffffff", fg="#1d1d1f", font=("Segoe UI", 18, "bold")).pack(side="left")
-        self.status = Label(self.top, text="检查中", bg="#ffffff", fg="#6e6e73", font=("Segoe UI", 10))
-        self.status.pack(side="right")
-        self.body = Text(self.root, wrap=WORD, bg="#f5f5f7", fg="#1d1d1f", relief="flat", padx=18, pady=16)
+        self.root.configure(bg=SKY)
+        self.header = SkyHeader(self.root)
+        self.header.pack(fill="x")
+        self.status = Label(self.root, text="检查中", bg=SKY, fg=MUTED, font=("Segoe UI", 10))
+        self.status.pack(anchor="e", padx=18, pady=(0, 4))
+        self.body = Text(self.root, wrap=WORD, bg=CARD, fg=INK, relief="flat", padx=22, pady=18)
         self.body.pack(fill="both", expand=True)
+        self.body.tag_configure("who", foreground=BLUE, spacing1=10, font=("Segoe UI", 10, "bold"))
+        self.body.tag_configure("line", foreground=INK, spacing3=12, font=("Segoe UI", 11))
         self._bottom()
         self._tools()
 
     def _bottom(self) -> None:
-        self.bottom = Frame(self.root, bg="#ffffff", padx=14, pady=12)
+        self.bottom = Frame(self.root, bg=SKY, padx=16, pady=12)
         self.bottom.pack(fill="x")
-        self.entry = Entry(self.bottom, relief="flat", font=("Segoe UI", 12))
+        self.entry = Entry(self.bottom, relief="flat", bg=CARD, fg=INK, font=("Segoe UI", 12))
         self.entry.pack(side="left", fill="x", expand=True, ipady=12)
         self.entry.bind("<Return>", lambda _event: self._submit())
-        Button(self.bottom, text="发送", command=self._submit, bg="#007aff", fg="#ffffff", relief="flat").pack(side="right", padx=(10, 0), ipadx=18, ipady=9)
+        Button(self.bottom, text="发送", command=self._submit, bg=BLUE, fg="#ffffff", relief="flat").pack(side="right", padx=(10, 0), ipadx=18, ipady=9)
 
     def _tools(self) -> None:
-        self.tools = Frame(self.root, bg="#ffffff", padx=10, pady=8)
+        self.tools = Frame(self.root, bg=SKY, padx=12, pady=8)
         self.tools.pack(fill="x")
-        Button(self.tools, text="对话", command=lambda: self._mode("chat"), relief="flat").pack(side="left")
-        Button(self.tools, text="智能体", command=lambda: self._mode("agent"), relief="flat").pack(side="left")
-        Checkbutton(self.tools, text="允许写入", variable=self.allow_write, bg="#ffffff").pack(side="left", padx=10)
+        Button(self.tools, text="对话", command=lambda: self._mode("chat"), bg=CARD, fg=INK, relief="flat").pack(side="left")
+        Button(self.tools, text="智能体", command=lambda: self._mode("agent"), bg=CARD, fg=INK, relief="flat").pack(side="left", padx=8)
+        Checkbutton(self.tools, text="允许写入", variable=self.allow_write, bg=SKY, fg=MUTED).pack(side="left", padx=4)
 
     def _status(self) -> None:
         data = request("GET", "/api/v1/status") or {}
@@ -78,5 +80,6 @@ class FengqingApp:
         return str(first.get("reply") or first or "智能体已完成任务。")
 
     def _say(self, who: str, text: str) -> None:
-        self.body.insert(END, f"{who}\n{text}\n\n")
+        self.body.insert(END, f"{who}\n", "who")
+        self.body.insert(END, f"{text}\n\n", "line")
         self.body.see(END)
