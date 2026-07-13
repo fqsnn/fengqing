@@ -56,6 +56,7 @@ class FengqingApp:
     def _tools(self) -> None:
         self.tools = Frame(self.root, bg=SKY, padx=12, pady=8)
         self.tools.pack(side="bottom", fill="x")
+        Button(self.tools, text="状态", command=self._show_runtime, bg=CARD, fg=INK, relief="flat").pack(side="left")
         Button(self.tools, text="对话", command=lambda: self._mode("chat"), bg=CARD, fg=INK, relief="flat").pack(side="left")
         Button(self.tools, text="智能体", command=lambda: self._mode("agent"), bg=CARD, fg=INK, relief="flat").pack(side="left", padx=8)
         Button(self.tools, text="进度", command=self._show_progress, bg=CARD, fg=INK, relief="flat").pack(side="left", padx=4)
@@ -67,7 +68,22 @@ class FengqingApp:
     def _status(self) -> None:
         data = request("GET", "/api/v1/status") or {}
         model = f"{data.get('provider', 'offline')} / {data.get('model', 'unknown')}"
-        self.status.config(text=f"{model} | {data.get('progress_stage', '未读取进度')}")
+        self.status.config(text=f"{model} | {_runtime_label(data)} | {data.get('progress_stage', '未读取进度')}")
+
+    def _show_runtime(self) -> None:
+        data = request("GET", "/api/v1/status") or {}
+        runtime = data.get("model_runtime", {})
+        runtime = runtime if isinstance(runtime, dict) else {}
+        lines = [
+            f"提供方：{data.get('provider', 'unknown')}",
+            f"配置模型：{data.get('model', 'unknown')}",
+            f"当前状态：{_runtime_label(data)}",
+            f"说明：{runtime.get('detail', '没有返回诊断说明。')}",
+        ]
+        models = runtime.get("available_models", [])
+        if isinstance(models, list):
+            lines.append(f"本机已下载：{', '.join(str(item) for item in models) or '无'}")
+        self._say("运行状态", "\n".join(lines))
 
     def _show_progress(self) -> None:
         data = request("GET", "/api/v1/progress") or {}
@@ -205,3 +221,18 @@ def _is_runtime_artifact(path: Path) -> bool:
         return path.resolve().is_relative_to(ARTIFACT_DIR.resolve())
     except OSError:
         return False
+
+
+def _runtime_label(data: dict[str, object]) -> str:
+    runtime = data.get("model_runtime", {})
+    state = str(runtime.get("state", "unknown")) if isinstance(runtime, dict) else "unknown"
+    labels = {
+        "ready": "模型就绪",
+        "model_missing": "模型未下载",
+        "unreachable": "Ollama 未连接",
+        "service_error": "Ollama 服务错误",
+        "invalid_response": "模型响应异常",
+        "configured_remote": "远程模型待验证",
+        "diagnostic_failed": "模型诊断失败",
+    }
+    return labels.get(state, "模型状态未知")

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from ..core.orchestrator import HybridOrchestrator
-from ..core.ports import ActivityHistoryPort, JsonMap, MemoryAdminPort, TaskLedgerPort
+from ..core.ports import ActivityHistoryPort, JsonMap, MemoryAdminPort, RuntimeProbePort, TaskLedgerPort
 from ..core.progress_ledger import progress_snapshot
 from ..core.runtime_status import runtime_status
 from ..core.services import AICoreService
@@ -30,6 +30,14 @@ class AgentEndpoint:
             return AgentResponse(result=result)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+class StatusEndpoint:
+    def __init__(self, probe: RuntimeProbePort) -> None:
+        self.probe = probe
+
+    async def __call__(self) -> JsonMap:
+        return await runtime_status(self.probe)
 
 
 class HistoryEndpoint:
@@ -85,9 +93,9 @@ class MemoryItemEndpoint:
         return item
 
 
-def get_router(service: AICoreService, orchestrator: HybridOrchestrator | None = None, history: ActivityHistoryPort | None = None, memories: MemoryAdminPort | None = None, tasks: TaskLedgerPort | None = None) -> APIRouter:
+def get_router(service: AICoreService, runtime_probe: RuntimeProbePort, orchestrator: HybridOrchestrator | None = None, history: ActivityHistoryPort | None = None, memories: MemoryAdminPort | None = None, tasks: TaskLedgerPort | None = None) -> APIRouter:
     router = APIRouter(prefix="/api/v1")
-    router.add_api_route("/status", status_endpoint, methods=["GET"])
+    router.add_api_route("/status", StatusEndpoint(runtime_probe).__call__, methods=["GET"])
     router.add_api_route("/progress", progress_endpoint, methods=["GET"])
     router.add_api_route("/chat", ChatEndpoint(service).__call__, methods=["POST"], response_model=ChatResponse)
     if orchestrator:
@@ -108,10 +116,6 @@ def _register_state_routes(router: APIRouter, history: ActivityHistoryPort | Non
         router.add_api_route("/memories", collection.create, methods=["POST"])
         router.add_api_route("/memories/{memory_id}", item.update, methods=["PATCH"])
         router.add_api_route("/memories/{memory_id}", item.delete, methods=["DELETE"])
-
-
-async def status_endpoint() -> JsonMap:
-    return runtime_status()
 
 
 async def progress_endpoint() -> JsonMap:

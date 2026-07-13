@@ -28,6 +28,12 @@ class PythonExampleRunnerPort(ABC):
         raise NotImplementedError
 
 
+class RuntimeProbePort(ABC):
+    @abstractmethod
+    async def model_status(self) -> JsonMap:
+        raise NotImplementedError
+
+
 class ShortTermMemoryPort(ABC):
     @abstractmethod
     async def save(self, session_id: str, conversation: Conversation) -> None:

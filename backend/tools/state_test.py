@@ -13,6 +13,7 @@ from app.core.quick_replies import quick_reply
 from app.infrastructure.activity_history import JsonlActivityHistory
 from app.infrastructure.private_memory import MarkdownContextRecall, MarkdownMemoryAdmin
 from app.infrastructure.python_example_runner import LocalPythonExampleRunner
+from app.infrastructure.runtime_probe import ollama_status_from_payload
 from app.infrastructure.task_ledger import JsonlTaskLedger
 
 
@@ -99,6 +100,14 @@ def _visual_progress_is_honest() -> bool:
     return "临时运行，不写入项目" in str(progress.get("summary")) and "项目源码未被修改" in str(progress.get("next"))
 
 
+def _runtime_probe_states() -> bool:
+    checked_at = "2026-07-13T00:00:00+00:00"
+    ready = ollama_status_from_payload("qwen2.5:0.5b", {"models": [{"name": "qwen2.5:0.5b"}]}, checked_at)
+    missing = ollama_status_from_payload("qwen2.5:7b", {"models": [{"name": "qwen2.5:0.5b"}]}, checked_at)
+    invalid = ollama_status_from_payload("qwen2.5:0.5b", {}, checked_at)
+    return ready.get("state") == "ready" and missing.get("state") == "model_missing" and missing.get("available_models") == ["qwen2.5:0.5b"] and invalid.get("state") == "invalid_response"
+
+
 async def _ui_question_route(runner: LocalPythonExampleRunner) -> bool:
     plan = direct_plan("你可以改一下你自己的 UI 吗")
     reply = await quick_reply("你可以改一下你自己的 UI 吗", runner) or ""
@@ -162,6 +171,7 @@ def main() -> int:
     passed = passed and _web_route()
     passed = passed and _empty_error_fails()
     passed = passed and _visual_progress_is_honest()
+    passed = passed and _runtime_probe_states()
     passed = passed and agent_intent("写一段 Python 爱心代码") is None
     passed = passed and agent_intent("修改项目代码") == "write"
     passed = passed and agent_intent("请运行测试") == "read"

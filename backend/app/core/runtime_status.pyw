@@ -1,14 +1,21 @@
 import os
 
-from .ports import JsonMap
+from .ports import JsonMap, RuntimeProbePort
 from .progress_ledger import CURRENT
 
 
-def runtime_status() -> JsonMap:
+async def runtime_status(probe: RuntimeProbePort) -> JsonMap:
     provider = os.getenv("AI_PROVIDER", "ollama").lower().strip()
     key = "OPENAI_MODEL" if provider == "openai" else "OLLAMA_MODEL"
-    return {"provider": provider, "model": os.getenv(key, "unknown"), **_capabilities(),
+    return {"provider": provider, "model": os.getenv(key, "unknown"), "model_runtime": await _probe_status(probe), **_capabilities(),
             "progress_stage": CURRENT["stage"], "latest_progress": CURRENT["focus"]}
+
+
+async def _probe_status(probe: RuntimeProbePort) -> JsonMap:
+    try:
+        return await probe.model_status()
+    except Exception as exc:
+        return {"state": "diagnostic_failed", "detail": "模型诊断未完成。", "error_type": type(exc).__name__}
 
 
 def _capabilities() -> JsonMap:

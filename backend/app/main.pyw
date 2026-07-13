@@ -22,6 +22,7 @@ from .infrastructure.memory_adapter import InMemoryMemoryAdapter
 from .infrastructure.private_memory import MarkdownContextRecall, MarkdownMemoryAdmin
 from .infrastructure.python_example_runner import LocalPythonExampleRunner
 from .infrastructure.reflection_adapter import SelfReflectionEngine
+from .infrastructure.runtime_probe import build_runtime_probe
 from .infrastructure.task_ledger import JsonlTaskLedger
 from .infrastructure.web_search_adapter import build_web_search_adapter
 
@@ -37,6 +38,7 @@ PRIVATE_MODEL_ENABLED = bool(private_context_for_model("enabled", os.getenv("AI_
 SYSTEM_PROMPT = "\n\n".join(part for part in [DEFAULT_SYSTEM_PROMPT, PUBLIC_CONTEXT] if part)
 
 llm = build_llm_adapter()
+runtime_probe = build_runtime_probe()
 memory = InMemoryMemoryAdapter()
 reflection = SelfReflectionEngine(llm)
 evolution = EvolutionEngine(SYSTEM_PROMPT)
@@ -58,7 +60,7 @@ service = AICoreService(
 )
 
 app = FastAPI(title="风轻思念浓 AI")
-app.include_router(get_router(service, orchestrator, activity_history, memory_admin, task_ledger))
+app.include_router(get_router(service, runtime_probe, orchestrator, activity_history, memory_admin, task_ledger))
 
 
 @app.get("/")
