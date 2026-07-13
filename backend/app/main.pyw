@@ -21,6 +21,7 @@ from .infrastructure.llm_adapter import build_llm_adapter
 from .infrastructure.memory_adapter import InMemoryMemoryAdapter
 from .infrastructure.private_memory import MarkdownContextRecall, MarkdownMemoryAdmin
 from .infrastructure.reflection_adapter import SelfReflectionEngine
+from .infrastructure.task_ledger import JsonlTaskLedger
 from .infrastructure.web_search_adapter import build_web_search_adapter
 
 logging.basicConfig(level=logging.INFO)
@@ -40,12 +41,13 @@ reflection = SelfReflectionEngine(llm)
 evolution = EvolutionEngine(SYSTEM_PROMPT)
 event_store = FileEventStore(BASE_DIR / "event_logs")
 activity_history = JsonlActivityHistory(BASE_DIR / "event_logs" / "activity.jsonl")
+task_ledger = JsonlTaskLedger(BASE_DIR / "event_logs" / "tasks.jsonl")
 shared_context = SharedContext(limit=8)
 web_search = build_web_search_adapter()
 context_recall = MarkdownContextRecall(PRIVATE_CONTEXT_DIR, WORKSPACE_CONTEXT_DIR)
 memory_admin = MarkdownMemoryAdmin(PRIVATE_CONTEXT_DIR, activity_history)
 code_agent = CodeAgent(llm, BASE_DIR)
-orchestrator = HybridOrchestrator(llm, code_agent, shared_context=shared_context, history=activity_history)
+orchestrator = HybridOrchestrator(llm, code_agent, shared_context=shared_context, history=activity_history, tasks=task_ledger)
 
 service = AICoreService(
     llm, memory, reflection, evolution, event_store, system_prompt=SYSTEM_PROMPT,
@@ -54,7 +56,7 @@ service = AICoreService(
 )
 
 app = FastAPI(title="风轻思念浓 AI")
-app.include_router(get_router(service, orchestrator, activity_history, memory_admin))
+app.include_router(get_router(service, orchestrator, activity_history, memory_admin, task_ledger))
 
 
 @app.get("/")

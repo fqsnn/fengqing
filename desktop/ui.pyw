@@ -7,6 +7,7 @@ from memory_window import MemoryWindow
 from sky_theme import BLUE, CARD, INK, MUTED, SKY, SkyHeader
 
 SESSION = f"desktop_{int(time.time())}"
+TASK_LABELS = {"planned": "已计划", "running": "运行中", "verified": "已验证", "completed": "已完成", "needs_attention": "待处理", "failed": "失败"}
 
 
 class FengqingApp:
@@ -55,6 +56,7 @@ class FengqingApp:
         Button(self.tools, text="智能体", command=lambda: self._mode("agent"), bg=CARD, fg=INK, relief="flat").pack(side="left", padx=8)
         Button(self.tools, text="进度", command=self._show_progress, bg=CARD, fg=INK, relief="flat").pack(side="left", padx=4)
         Button(self.tools, text="记忆", command=lambda: MemoryWindow(self.root, request), bg=CARD, fg=INK, relief="flat").pack(side="left", padx=4)
+        Button(self.tools, text="任务", command=self._show_tasks, bg=CARD, fg=INK, relief="flat").pack(side="left", padx=4)
         Button(self.tools, text="历史", command=self._show_history, bg=CARD, fg=INK, relief="flat").pack(side="left", padx=4)
         Checkbutton(self.tools, text="允许写入", variable=self.allow_write, bg=SKY, fg=MUTED).pack(side="left", padx=4)
 
@@ -73,8 +75,20 @@ class FengqingApp:
         text = "\n".join(self._history_line(item) for item in items if isinstance(item, dict))
         self._say("历史", text or "还没有智能体执行或记忆变更记录。")
 
+    def _show_tasks(self) -> None:
+        data = request("GET", "/api/v1/tasks?limit=8") or {}
+        items = data.get("items", []) if isinstance(data.get("items"), list) else []
+        text = "\n".join(self._task_line(item) for item in items if isinstance(item, dict))
+        self._say("任务", text or "还没有可追溯的智能体任务。")
+
+    def _task_line(self, task: dict[str, object]) -> str:
+        task_id = str(task.get("id", ""))[:8]
+        status = TASK_LABELS.get(str(task.get("status", "unknown")), "未知")
+        instruction = str(task.get("instruction", ""))[:72]
+        return f"{task_id}  {status}：{instruction}"
+
     def _history_line(self, item: dict[str, object]) -> str:
-        labels = {"agent_run": "智能体", "memory_added": "新增记忆", "memory_updated": "修改记忆", "memory_deleted": "删除记忆"}
+        labels = {"agent_run": "智能体", "task_state": "任务状态", "memory_added": "新增记忆", "memory_updated": "修改记忆", "memory_deleted": "删除记忆"}
         data = item.get("data", {}) if isinstance(item.get("data"), dict) else {}
         detail = data.get("instruction") or _memory_detail(data)
         return f"{item.get('time', '')}  {labels.get(str(item.get('kind')), str(item.get('kind')))}：{detail}"

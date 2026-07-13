@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from ..core.orchestrator import HybridOrchestrator
-from ..core.ports import ActivityHistoryPort, JsonMap, MemoryAdminPort
+from ..core.ports import ActivityHistoryPort, JsonMap, MemoryAdminPort, TaskLedgerPort
 from ..core.progress_ledger import progress_snapshot
 from ..core.runtime_status import runtime_status
 from ..core.services import AICoreService
@@ -41,6 +41,15 @@ class HistoryEndpoint:
         return {"items": items, "count": len(items)}
 
 
+class TasksEndpoint:
+    def __init__(self, tasks: TaskLedgerPort) -> None:
+        self.tasks = tasks
+
+    async def __call__(self, limit: int = 20) -> JsonMap:
+        items = await self.tasks.list_tasks(limit=limit)
+        return {"items": items, "count": len(items)}
+
+
 class MemoryCollectionEndpoint:
     def __init__(self, memories: MemoryAdminPort) -> None:
         self.memories = memories
@@ -76,7 +85,7 @@ class MemoryItemEndpoint:
         return item
 
 
-def get_router(service: AICoreService, orchestrator: HybridOrchestrator | None = None, history: ActivityHistoryPort | None = None, memories: MemoryAdminPort | None = None) -> APIRouter:
+def get_router(service: AICoreService, orchestrator: HybridOrchestrator | None = None, history: ActivityHistoryPort | None = None, memories: MemoryAdminPort | None = None, tasks: TaskLedgerPort | None = None) -> APIRouter:
     router = APIRouter(prefix="/api/v1")
     router.add_api_route("/status", status_endpoint, methods=["GET"])
     router.add_api_route("/progress", progress_endpoint, methods=["GET"])
@@ -84,13 +93,15 @@ def get_router(service: AICoreService, orchestrator: HybridOrchestrator | None =
     if orchestrator:
         endpoint = AgentEndpoint(orchestrator).__call__
         router.add_api_route("/agent", endpoint, methods=["POST"], response_model=AgentResponse)
-    _register_state_routes(router, history, memories)
+    _register_state_routes(router, history, memories, tasks)
     return router
 
 
-def _register_state_routes(router: APIRouter, history: ActivityHistoryPort | None, memories: MemoryAdminPort | None) -> None:
+def _register_state_routes(router: APIRouter, history: ActivityHistoryPort | None, memories: MemoryAdminPort | None, tasks: TaskLedgerPort | None) -> None:
     if history:
         router.add_api_route("/history", HistoryEndpoint(history).__call__, methods=["GET"])
+    if tasks:
+        router.add_api_route("/tasks", TasksEndpoint(tasks).__call__, methods=["GET"])
     if memories:
         collection, item = MemoryCollectionEndpoint(memories), MemoryItemEndpoint(memories)
         router.add_api_route("/memories", collection.list_items, methods=["GET"])

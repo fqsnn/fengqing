@@ -70,6 +70,20 @@ class ActivityHistoryPort(ABC):
         raise NotImplementedError
 
 
+class TaskLedgerPort(ABC):
+    @abstractmethod
+    async def create(self, instruction: str, plan: list[JsonMap], allow_write: bool) -> JsonMap:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def transition(self, task_id: str, status: str, progress: JsonMap | None = None) -> JsonMap | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_tasks(self, limit: int = 20) -> list[JsonMap]:
+        raise NotImplementedError
+
+
 class MemoryAdminPort(ABC):
     @abstractmethod
     async def list_facts(self) -> list[JsonMap]:

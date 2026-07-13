@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 from app.core.agent_gateway import agent_intent, delegated_instruction
 from app.infrastructure.activity_history import JsonlActivityHistory
 from app.infrastructure.private_memory import MarkdownContextRecall, MarkdownMemoryAdmin
+from app.infrastructure.task_ledger import JsonlTaskLedger
 
 
 async def _create_memory(admin: MarkdownMemoryAdmin, recall: MarkdownContextRecall) -> dict[str, object] | None:
@@ -20,6 +21,35 @@ async def _rejects_blank(admin: MarkdownMemoryAdmin, memory_id: str) -> bool:
     except ValueError:
         return True
     return False
+
+
+async def _task_lifecycle(root: Path) -> bool:
+    path = root / "tasks.jsonl"
+    ledger = JsonlTaskLedger(path)
+    task = await ledger.create("检查项目", [{"id": "check", "action": "run_tests", "params": {}}], False)
+    try:
+        await ledger.transition(str(task["id"]), "completed")
+        return False
+    except ValueError:
+        pass
+    running = await ledger.transition(str(task["id"]), "running")
+    verified = await ledger.transition(str(task["id"]), "verified", {"passed": True})
+    completed = await ledger.transition(str(task["id"]), "completed", {"passed": True})
+    loaded = await JsonlTaskLedger(path).list_tasks()
+    states = completed.get("states", []) if completed else []
+    return bool(running and verified and completed and loaded) and completed.get("status") == "completed" and len(states) == 4
+
+
+async def _task_failure(root: Path) -> bool:
+    ledger = JsonlTaskLedger(root / "failed-tasks.jsonl")
+    task = await ledger.create("失败任务", [], False)
+    running = await ledger.transition(str(task["id"]), "running")
+    failed = await ledger.transition(str(task["id"]), "failed", {"error": "test"})
+    try:
+        await ledger.transition(str(task["id"]), "running")
+        return False
+    except ValueError:
+        return bool(running and failed) and failed.get("status") == "failed"
 
 
 def _workspace_sync(root: Path) -> bool:
@@ -53,7 +83,7 @@ async def _exercise(root: Path) -> bool:
 def main() -> int:
     with TemporaryDirectory() as temporary:
         root = Path(temporary)
-        passed = asyncio.run(_exercise(root)) and _workspace_sync(root)
+        passed = asyncio.run(_exercise(root)) and asyncio.run(_task_lifecycle(root)) and asyncio.run(_task_failure(root)) and _workspace_sync(root)
     passed = passed and agent_intent("请运行测试") == "read"
     passed = passed and delegated_instruction("继续推进AI项目", "write").startswith("自己编程自己")
     print(f"state_test={'pass' if passed else 'fail'}")
