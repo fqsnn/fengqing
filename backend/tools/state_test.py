@@ -62,7 +62,8 @@ async def _code_example_route(runner: LocalPythonExampleRunner) -> bool:
     plan = direct_plan("写一段 Python 爱心代码")
     reply = await quick_reply("写一段 Python 爱心代码", runner) or ""
     payload = heart_reply(await runner.run_heart())
-    return bool(plan) and plan[0]["action"] == "generate_python_heart" and "本机 Python" in reply and "*" in reply and payload.get("writes_project") is False
+    output = str(payload.get("execution", {}).get("stdout", ""))
+    return bool(plan) and plan[0]["action"] == "generate_python_heart" and "本机 Python" in reply and output.startswith("         ****") and "```text\n         ****" in str(payload.get("reply", "")) and payload.get("writes_project") is False
 
 
 def _project_push_route() -> bool:

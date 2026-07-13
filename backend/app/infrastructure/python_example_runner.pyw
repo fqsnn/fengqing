@@ -53,7 +53,7 @@ def _result(code: int, stdout: bytes, stderr: bytes, started: float, timed_out: 
 
 
 def _tail(data: bytes) -> str:
-    return data.decode("utf-8", errors="replace").strip()[-MAX_OUTPUT_CHARS:]
+    return data.decode("utf-8", errors="replace")[-MAX_OUTPUT_CHARS:].rstrip()
 
 
 def _bytes(data: bytes | str | None) -> bytes:

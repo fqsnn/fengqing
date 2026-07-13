@@ -1,13 +1,36 @@
 from .ports import JsonMap
 
-PYTHON_HEART_SOURCE = """def heart(size: int = 12) -> None:
-    for y in range(size, -size, -1):
-        line: list[str] = []
-        for x in range(-2 * size, 2 * size + 1):
-            horizontal, vertical = x / size, y / size
-            inside = (horizontal ** 2 + vertical ** 2 - 1) ** 3 - horizontal ** 2 * vertical ** 3 <= 0
-            line.append("*" if inside else " ")
-        print("".join(line).rstrip())
+PYTHON_HEART_SOURCE = """def heart() -> None:
+    rows = (
+        "         ****       ****",
+        "        *******   *******",
+        "       ********* *********",
+        "      *********************",
+        "     ***********************",
+        "    *************************",
+        "   ***************************",
+        "  *****************************",
+        " *******************************",
+        "*********************************",
+        " *******************************",
+        "  *****************************",
+        "   ***************************",
+        "    *************************",
+        "     ***********************",
+        "      *********************",
+        "       *******************",
+        "        *****************",
+        "         ***************",
+        "          *************",
+        "           ***********",
+        "            *********",
+        "             *******",
+        "              *****",
+        "               ***",
+        "                *",
+    )
+    for row in rows:
+        print(row.rstrip())
 
 
 heart()
@@ -30,6 +53,6 @@ def _status(execution: JsonMap) -> str:
 
 
 def _output(execution: JsonMap) -> str:
-    stdout = str(execution.get("stdout", "")).strip()
-    stderr = str(execution.get("stderr", "")).strip()
+    stdout = str(execution.get("stdout", "")).rstrip()
+    stderr = str(execution.get("stderr", "")).rstrip()
     return stdout or stderr or "Python 没有返回输出。"
