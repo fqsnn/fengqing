@@ -1,16 +1,20 @@
+import json
+import re
 import time
 from pathlib import Path
 from shutil import copy
 
-from .code_prompts import extract_code, file_stats, improve_prompt, review_prompt, static_review
+from .code_prompts import extract_code, file_stats, improve_prompt, patch_prompt, review_prompt, static_review
 from .command_runner import run_quality_commands
 from .ports import LLMEnginePort
 from .resource_balance import ResourceBalance
 from .source_tree import SourceTree
 
+UI_NUMBER_PATTERN = re.compile(r"\b(padx|pady|ipadx|ipady|spacing1|spacing3)=(\d+)\b")
+
 
 class CodeAgent:
-    MAX_FILE_CHARS = 12000
+    MAX_FILE_CHARS = 16000
 
     def __init__(self, llm: LLMEnginePort, target_dir: str | Path, resource_balance: ResourceBalance) -> None:
         self.llm = llm
@@ -40,8 +44,8 @@ class CodeAgent:
             reviews.append(review)
         return {"reviewed": len(reviews), "items": reviews}
 
-    async def improve(self, path: str, allow_write: bool = False, verify_commands: bool = True) -> dict[str, object]:
-        proposal = await self._propose_improvement(path)
+    async def improve(self, path: str, allow_write: bool = False, verify_commands: bool = True, goal: str = "", patch_mode: bool = False) -> dict[str, object]:
+        proposal = await self._propose_improvement(path, goal, patch_mode)
         if not allow_write:
             preview = str(proposal["code"])[:2000]
             return {"path": proposal["path"], "changed": False, "dry_run": True, "preview": preview}
@@ -81,14 +85,34 @@ class CodeAgent:
         error = RuntimeError("previous LLM request failed")
         return {"path": item["path"], "review": static_review(str(item["content"]), error)}
 
-    async def _propose_improvement(self, path: str) -> dict[str, object]:
+    async def _propose_improvement(self, path: str, goal: str, patch_mode: bool) -> dict[str, object]:
         item = self.read_file(path)
+        if bool(item["truncated"]):
+            raise ValueError(f"source exceeds {self.MAX_FILE_CHARS} chars; split it before self-modification")
         content = str(item["content"])
-        prompt = improve_prompt(str(item["path"]), content)
+        if patch_mode:
+            return await self._propose_patch(str(item["path"]), content, goal)
+        prompt = improve_prompt(str(item["path"]), content, goal)
         decision = self.resource_balance.decide(prompt, operation="code_write")
         code = extract_code(await self.llm.generate_response([{"role": "user", "content": prompt}], max_output_tokens=decision.code_output_tokens(len(content))))
         compile(code, str(item["path"]), "exec")
         return {"path": item["path"], "code": code}
+
+    async def _propose_patch(self, path: str, content: str, goal: str) -> dict[str, object]:
+        candidates = _ui_candidates(content)
+        if not candidates:
+            raise ValueError("no safe UI tuning candidates found")
+        errors: list[str] = []
+        for _ in range(2):
+            prompt = patch_prompt(path, candidates, goal, "；".join(errors))
+            decision = self.resource_balance.decide(prompt, operation="code_write")
+            try:
+                code = _apply_patch(content, await self.llm.generate_response([{"role": "user", "content": prompt}], max_output_tokens=min(256, decision.code_output_tokens(len(prompt)))), candidates)
+                compile(code, path, "exec")
+                return {"path": path, "code": code}
+            except (SyntaxError, ValueError) as exc:
+                errors.append(str(exc))
+        raise ValueError(f"UI patch rejected after {len(errors)} attempts: {errors[-1]}")
 
     async def _write_proposal(self, path: str, proposal: dict[str, object], verify_commands: bool) -> dict[str, object]:
         file_path, backup = self._apply_proposal(path, proposal)
@@ -119,3 +143,37 @@ class CodeAgent:
         restored_validation = self.validate_project()
         restored_commands = await run_quality_commands() if verify_commands else {}
         return {"path": proposal["path"], "changed": False, "restored": True, "validation": restored_validation, "commands": restored_commands, "failed_validation": validation, "failed_commands": commands}
+
+
+def _ui_candidates(source: str) -> list[tuple[str, int]]:
+    candidates: list[tuple[str, int]] = []
+    for match in UI_NUMBER_PATTERN.finditer(source):
+        fragment = match.group(0)
+        if source.count(fragment) == 1:
+            candidates.append((fragment, int(match.group(2))))
+    return candidates[:8]
+
+
+def _apply_patch(source: str, response: str, candidates: list[tuple[str, int]]) -> str:
+    payload = _json_object(response)
+    identifier, value = payload.get("id"), payload.get("value")
+    if type(identifier) is not int or type(value) is not int:
+        raise ValueError("patch id and value must be integers")
+    if not 1 <= identifier <= len(candidates) or not 8 <= value <= 48:
+        raise ValueError("patch id or value is outside the safe range")
+    find, old_value = candidates[identifier - 1]
+    if value == old_value or abs(value - old_value) > 12:
+        raise ValueError("patch value must be a small, real change")
+    if source.count(find) != 1:
+        raise ValueError("patch target must match exactly one source fragment")
+    return source.replace(find, f"{find.split('=', 1)[0]}={value}", 1)
+
+
+def _json_object(response: str) -> dict[str, object]:
+    try:
+        payload = json.loads(extract_code(response))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"patch is not JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("patch must be a JSON object")
+    return payload

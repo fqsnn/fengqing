@@ -10,7 +10,7 @@ TAIL_CHARS = 2400
 
 COMPILE_SCRIPT = """
 from pathlib import Path
-files = list(Path("app").rglob("*.pyw")) + list(Path("tools").rglob("*.py"))
+files = list(Path("app").rglob("*.pyw")) + list(Path("tools").rglob("*.py")) + list(Path("../desktop").rglob("*.pyw"))
 for path in files:
     compile(path.read_text(encoding="utf-8"), str(path), "exec")
 print(f"compile=pass checked={len(files)}")

@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 
 from PIL import Image
 
+from app.core.agent import _apply_patch
 from app.core.agent_gateway import agent_intent, delegated_instruction
 from app.core.agent_progress import summarize_agent_progress
 from app.core.orchestrator import _accepts_plan, _web_reply
@@ -128,6 +129,21 @@ async def _ui_question_route(runner: LocalPythonExampleRunner) -> bool:
     return bool(plan) and plan[0]["action"] == "explain_ui_change" and "不会擅自改界面" in reply
 
 
+def _ui_self_optimization_route() -> bool:
+    plan = direct_plan("自己优化自己的 UI 页面")
+    return bool(plan) and plan[0]["action"] == "improve_ui" and plan[0]["params"].get("instruction") == "自己优化自己的 UI 页面"
+
+
+def _unique_ui_patch_guard() -> bool:
+    candidates = [("padx=22", 22)]
+    changed = _apply_patch("box = Frame(root, padx=22)\n", '{"id":1,"value":24}', candidates) == "box = Frame(root, padx=24)\n"
+    try:
+        _apply_patch("box = Frame(root, padx=22)\n", '{"id":1,"value":22}', candidates)
+    except ValueError:
+        return changed
+    return False
+
+
 async def _ai_creation_route(runner: LocalPythonExampleRunner) -> bool:
     plan = direct_plan("你可以自己创造 AI 吗")
     reply = await quick_reply("你可以自己创造 AI 吗", runner) or ""
@@ -179,7 +195,7 @@ async def _exercise(root: Path) -> bool:
 def _checks() -> bool:
     return all((
         asyncio.run(_quick_routes()), _project_push_route(), _web_route(), _resource_scheduler_route(), _empty_error_fails(),
-        _visual_progress_is_honest(), _restored_write_needs_attention(), _runtime_probe_states(),
+        _visual_progress_is_honest(), _restored_write_needs_attention(), _runtime_probe_states(), _ui_self_optimization_route(), _unique_ui_patch_guard(),
         agent_intent("写一段 Python 爱心代码") is None, agent_intent("修改项目代码") == "write",
         agent_intent("请运行测试") == "read", delegated_instruction("继续推进AI项目", "write").startswith("自己编程自己"),
     ))

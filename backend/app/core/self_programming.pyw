@@ -7,11 +7,11 @@ from .game_coupling import game_progress_from_ai
 from .ports import JsonMap
 
 
-async def self_program_once(agent: CodeAgent, allow_write: bool, instruction: str, max_files: int = 1) -> JsonMap:
+async def self_program_once(agent: CodeAgent, allow_write: bool, instruction: str, max_files: int = 1, goal: str = "", target_path: str = "", patch_mode: bool = False) -> JsonMap:
     before = agent.validate_project()
     baseline_commands = await run_quality_commands()
-    target = _target(agent.analyze_project(), max_files)
-    items = await _program(agent, target, allow_write)
+    target = _target(agent.analyze_project(), max_files, target_path)
+    items = await _program(agent, target, allow_write, goal, patch_mode)
     after = agent.validate_project()
     commands = await run_quality_commands()
     rolled_back = _rollback_if_needed(agent, allow_write, bool(baseline_commands["passed"]), bool(commands["passed"]), items)
@@ -30,21 +30,23 @@ def _payload(
     return data
 
 
-def _target(analysis: JsonMap, max_files: int) -> list[JsonMap]:
+def _target(analysis: JsonMap, max_files: int, target_path: str = "") -> list[JsonMap]:
+    if target_path:
+        return [{"path": target_path}]
     files = analysis.get("largest_files", [])
     if not isinstance(files, list):
         return []
     return [item for item in files[: max(1, max_files)] if isinstance(item, dict)]
 
 
-async def _program(agent: CodeAgent, target: list[JsonMap], allow_write: bool) -> list[JsonMap]:
+async def _program(agent: CodeAgent, target: list[JsonMap], allow_write: bool, goal: str, patch_mode: bool) -> list[JsonMap]:
     items: list[JsonMap] = []
     for item in target:
         path = item.get("path")
         if not isinstance(path, str):
             continue
         try:
-            items.append(await agent.improve(path, allow_write=allow_write, verify_commands=False))
+            items.append(await agent.improve(path, allow_write=allow_write, verify_commands=False, goal=goal, patch_mode=patch_mode))
         except Exception as exc:
             items.append({"path": path, "changed": False, "error": str(exc)})
     return items

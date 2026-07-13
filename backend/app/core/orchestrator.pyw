@@ -13,17 +13,14 @@ from .resource_balance import ResourceBalance, ResourceDecision
 from .self_programming import self_program_once
 from .shared_context import SharedContext
 
+UI_GOAL = "优化原生 Tk 桌面界面；保留对话、智能体、状态、记忆、任务、历史、允许写入和运行状态功能；不新增浏览器入口、外部请求或越权能力。"
+
 
 class HybridOrchestrator(AgentRunnerPort):
-    def __init__(self, llm: LLMEnginePort, code_agent: CodeAgent, python_runner: PythonExampleRunnerPort, resource_balance: ResourceBalance, web_search: WebSearchPort | None = None, shared_context: SharedContext | None = None, history: ActivityHistoryPort | None = None, tasks: TaskLedgerPort | None = None) -> None:
-        self.llm = llm
-        self.code_agent = code_agent
-        self.python_runner = python_runner
-        self.resource_balance = resource_balance
-        self.web_search = web_search
-        self.shared_context = shared_context
-        self.history = history
-        self.tasks = tasks
+    def __init__(self, llm: LLMEnginePort, code_agent: CodeAgent, ui_agent: CodeAgent, python_runner: PythonExampleRunnerPort, resource_balance: ResourceBalance, web_search: WebSearchPort | None = None, shared_context: SharedContext | None = None, history: ActivityHistoryPort | None = None, tasks: TaskLedgerPort | None = None) -> None:
+        self.llm, self.code_agent, self.ui_agent, self.python_runner = llm, code_agent, ui_agent, python_runner
+        self.resource_balance, self.web_search, self.shared_context = resource_balance, web_search, shared_context
+        self.history, self.tasks = history, tasks
         self.registry: dict[str, Callable[..., Awaitable[object]]] = {
             "analyze_code": self._analyze_code, "review_code": self._review_code,
             "improve_code": self._improve_code, "read_file": self._read_file,
@@ -115,6 +112,8 @@ class HybridOrchestrator(AgentRunnerPort):
             return await controlled_self_evolution(self.code_agent, allow_write, int(params.get("max_files", 1)))
         if action == "self_program_once":
             return await self_program_once(self.code_agent, allow_write, str(params.get("instruction", "")), int(params.get("max_files", 1)))
+        if action == "improve_ui":
+            return await self._improve_ui(str(params.get("instruction", "")), allow_write)
         if action not in self.registry:
             return {"error": f"Unknown action: {action}"}
         return await self.registry[action](**params)
@@ -141,6 +140,12 @@ class HybridOrchestrator(AgentRunnerPort):
             return await self.code_agent.improve(path, allow_write=allow_write)
         items = await self.code_agent._run_self_improvement_cycle(allow_write=allow_write, max_files=max_files)
         return {"items": items}
+
+    async def _improve_ui(self, instruction: str, allow_write: bool) -> JsonMap:
+        goal = f"{UI_GOAL} 用户目标：{instruction or '提升界面可用性。'}"
+        result = await self_program_once(self.ui_agent, allow_write, instruction, goal=goal, target_path="ui.pyw", patch_mode=True)
+        result["scope"] = "desktop_ui"
+        return result
 
     async def _read_file(self, path: str) -> JsonMap:
         return self.code_agent.read_file(path)

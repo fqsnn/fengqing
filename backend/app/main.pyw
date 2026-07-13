@@ -31,6 +31,7 @@ from .infrastructure.web_search_adapter import build_web_search_adapter
 logging.basicConfig(level=logging.INFO)
 
 BASE_DIR = Path(__file__).resolve().parents[1]
+DESKTOP_DIR = BASE_DIR.parent / "desktop"
 CONTEXT_DIR = BASE_DIR / "context"
 PRIVATE_CONTEXT_DIR = context_dir_from_env("PRIVATE_CONTEXT_DIR") or BASE_DIR / "private_context"
 WORKSPACE_CONTEXT_DIR = context_dir_from_env("WORKSPACE_CONTEXT_DIR")
@@ -55,7 +56,8 @@ public_context_recall = LocalContextRecall(PUBLIC_CONTEXT)
 memory_admin = MarkdownMemoryAdmin(PRIVATE_CONTEXT_DIR, activity_history)
 python_runner = LocalPythonExampleRunner(artifact_dir=BASE_DIR / "runtime_artifacts")
 code_agent = CodeAgent(llm, BASE_DIR, resource_balance)
-orchestrator = HybridOrchestrator(llm, code_agent, python_runner, resource_balance, web_search=web_search, shared_context=shared_context, history=activity_history, tasks=task_ledger)
+ui_agent = CodeAgent(llm, DESKTOP_DIR, resource_balance)
+orchestrator = HybridOrchestrator(llm, code_agent, ui_agent, python_runner, resource_balance, web_search=web_search, shared_context=shared_context, history=activity_history, tasks=task_ledger)
 
 service = AICoreService(
     llm, memory, reflection, evolution, event_store, python_runner, system_prompt=SYSTEM_PROMPT,

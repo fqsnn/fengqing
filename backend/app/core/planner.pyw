@@ -5,7 +5,7 @@ from .dual_loop import needs_web_search
 from .ports import JsonMap
 
 ACTIONS = (
-    "analyze_code", "review_code", "improve_code", "read_file", "run_tests", "run_quality_commands", "generate_python_heart",
+    "analyze_code", "review_code", "improve_code", "improve_ui", "read_file", "run_tests", "run_quality_commands", "generate_python_heart",
     "explain_ui_change", "explain_ai_creation", "explain_computer_control", "explain_agent_scope",
     "web_search", "explain_dual_loop", "explain_self_change", "explain_self_programming", "explain_codex_like",
     "explain_codex_acceleration", "explain_identity_transfer", "explain_runtime", "explain_security_boundary",
@@ -45,6 +45,7 @@ HEART_WORDS = ("爱心", "心形")
 HEART_TOOL_WORDS = ("代码", "编程", "python", "程序", "生成", "画", "绘制")
 PROJECT_PUSH_WORDS = ("继续推进你自己的项目", "继续推进自己的项目", "继续推进项目", "推进你自己的项目", "推进自己的项目")
 UI_CHANGE_WORDS = ("你自己的ui", "自己的ui", "自身ui", "你自己的界面", "自己的界面")
+UI_OPTIMIZE_WORDS = ("自己优化自己的ui", "优化自己的ui", "优化自己ui", "自己优化自己的界面", "优化自己的界面", "自己修改自己的ui", "修改自己的ui")
 AI_CREATION_WORDS = ("自己创造ai", "自己创建ai", "创造ai", "创建ai", "做一个ai")
 COMPUTER_CONTROL_WORDS = ("自动操作电脑", "操作电脑", "控制电脑", "控制系统", "操作系统")
 
@@ -67,7 +68,7 @@ SPECIAL_RULES = (
 
 def direct_plan(instruction: str) -> list[JsonMap]:
     text = instruction.lower()
-    return _example_plan(text) or _web_plan(instruction) or _ui_change_plan(text) or _ai_creation_plan(text) or _computer_control_plan(text) or _project_push_plan(instruction, text) or _mobile_plan(instruction, text) or _evolve_plan(instruction) or _special_plan(text) or _code_plan(instruction)
+    return _example_plan(text) or _web_plan(instruction) or _ui_change_plan(instruction, text) or _ai_creation_plan(text) or _computer_control_plan(text) or _project_push_plan(instruction, text) or _mobile_plan(instruction, text) or _evolve_plan(instruction) or _special_plan(text) or _code_plan(instruction)
 
 
 def _example_plan(text: str) -> list[JsonMap]:
@@ -86,8 +87,10 @@ def _project_push_plan(instruction: str, text: str) -> list[JsonMap]:
     return []
 
 
-def _ui_change_plan(text: str) -> list[JsonMap]:
+def _ui_change_plan(instruction: str, text: str) -> list[JsonMap]:
     compact = re.sub(r"\s+", "", text)
+    if _has(compact, UI_OPTIMIZE_WORDS):
+        return [_step("improve_ui", "improve_ui", {"instruction": instruction})]
     return [_step("ui_change", "explain_ui_change")] if _has(compact, UI_CHANGE_WORDS) else []
 
 

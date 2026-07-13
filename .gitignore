@@ -11,6 +11,7 @@ __pycache__/
 event_logs/
 backend/event_logs/
 backend/.backup/
+desktop/.backup/
 backend/private_context/
 
 *.log
