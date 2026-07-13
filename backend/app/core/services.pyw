@@ -1,7 +1,7 @@
 from .entities import Conversation, Reflection
 from .conversation_style import natural_reply, polish_reply
 from .dual_loop import DUAL_LOOP_SYSTEM, format_search_context, needs_web_search
-from .ports import EventStorePort, EvolutionEnginePort, LLMEnginePort, ReflectionEnginePort, ShortTermMemoryPort, WebSearchPort
+from .ports import ContextRecallPort, EventStorePort, EvolutionEnginePort, LLMEnginePort, ReflectionEnginePort, ShortTermMemoryPort, WebSearchPort
 from .prompts import DEFAULT_SYSTEM_PROMPT
 from .quick_replies import quick_reply
 from .shared_context import SharedContext
@@ -18,6 +18,7 @@ class AICoreService:
         system_prompt: str = DEFAULT_SYSTEM_PROMPT,
         shared_context: SharedContext | None = None,
         web_search: WebSearchPort | None = None,
+        context_recall: ContextRecallPort | None = None,
     ) -> None:
         self.llm = llm
         self.memory = memory
@@ -27,6 +28,7 @@ class AICoreService:
         self.system_prompt = system_prompt
         self.shared_context = shared_context
         self.web_search = web_search
+        self.context_recall = context_recall
         self._reflection_buffer: list[Reflection] = []
         self.evolution_window = 3
         self.evolution_threshold = 0.7
@@ -45,7 +47,9 @@ class AICoreService:
     async def _fast_reply(self, session_id: str, conv: Conversation, user_input: str) -> str:
         if needs_web_search(user_input):
             return ""
-        for event_type, reply in (("NATURAL_REPLY", natural_reply(user_input, conv)), ("FAST_REPLY", quick_reply(user_input))):
+        recalled = self.context_recall.recall(user_input) if self.context_recall else None
+        replies = (("PRIVATE_RECALL", recalled), ("NATURAL_REPLY", natural_reply(user_input, conv)), ("FAST_REPLY", quick_reply(user_input)))
+        for event_type, reply in replies:
             if reply:
                 await self._save_answer(session_id, conv, user_input, reply)
                 await self.event_store.append_event(session_id, event_type, {"reply": reply})

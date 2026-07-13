@@ -44,6 +44,12 @@ class WebSearchPort(ABC):
         raise NotImplementedError
 
 
+class ContextRecallPort(ABC):
+    @abstractmethod
+    def recall(self, query: str) -> str | None:
+        raise NotImplementedError
+
+
 class EventStorePort(ABC):
     @abstractmethod
     async def append_event(self, session_id: str, event_type: str, data: JsonMap) -> None:

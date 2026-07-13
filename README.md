@@ -95,6 +95,17 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 
 OpenAI 模式使用官方 Responses API。它不是直接调用某个 ChatGPT 或 Codex 会话，而是用你的 API key 调用账号可用模型。
 
+## 本机私人上下文
+
+可在不会提交到 Git 的 `backend/.env.local` 中配置只供本机读取的 Markdown 目录：
+
+```env
+PRIVATE_CONTEXT_DIR=C:/path/to/private-context
+PRIVATE_CONTEXT_ALLOW_REMOTE=false
+```
+
+私人上下文会参与本地记忆检索。使用 Ollama 时也可进入模型提示；切换远程 API 后默认不会发送私人上下文，除非用户明确把 `PRIVATE_CONTEXT_ALLOW_REMOTE` 改为 `true`。
+
 ## 安全边界
 
 代码智能体默认只分析、审查和生成修改预案。真正写文件必须显式允许，并且会先备份、后验证，验证失败回滚。

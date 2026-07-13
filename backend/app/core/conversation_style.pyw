@@ -49,6 +49,8 @@ def _topic(user_input: str, conv: Conversation) -> str:
     if direct:
         return direct
     for message in reversed(conv.messages[:-1]):
+        if message.role != "user":
+            continue
         found = _first_topic(message.content)
         if found:
             return found
