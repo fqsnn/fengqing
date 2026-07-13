@@ -33,3 +33,4 @@ version
 .idea/
 .DS_Store
 Thumbs.db
+backend/runtime_artifacts/

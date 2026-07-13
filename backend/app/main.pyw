@@ -47,7 +47,7 @@ shared_context = SharedContext(limit=8)
 web_search = build_web_search_adapter()
 context_recall = MarkdownContextRecall(PRIVATE_CONTEXT_DIR, WORKSPACE_CONTEXT_DIR)
 memory_admin = MarkdownMemoryAdmin(PRIVATE_CONTEXT_DIR, activity_history)
-python_runner = LocalPythonExampleRunner()
+python_runner = LocalPythonExampleRunner(artifact_dir=BASE_DIR / "runtime_artifacts")
 code_agent = CodeAgent(llm, BASE_DIR)
 orchestrator = HybridOrchestrator(llm, code_agent, python_runner, web_search=web_search, shared_context=shared_context, history=activity_history, tasks=task_ledger)
 

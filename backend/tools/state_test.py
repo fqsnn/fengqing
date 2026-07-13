@@ -2,6 +2,8 @@ import asyncio
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from PIL import Image
+
 from app.core.agent_gateway import agent_intent, delegated_instruction
 from app.core.agent_progress import summarize_agent_progress
 from app.core.orchestrator import _accepts_plan, _web_reply
@@ -62,8 +64,11 @@ async def _code_example_route(runner: LocalPythonExampleRunner) -> bool:
     plan = direct_plan("写一段 Python 爱心代码")
     reply = await quick_reply("写一段 Python 爱心代码", runner) or ""
     payload = heart_reply(await runner.run_heart())
-    output = str(payload.get("execution", {}).get("stdout", ""))
-    return bool(plan) and plan[0]["action"] == "generate_python_heart" and "本机 Python" in reply and output.startswith("         ****") and "```text\n         ****" in str(payload.get("reply", "")) and payload.get("writes_project") is False
+    execution = payload.get("execution", {})
+    artifact = Path(str(execution.get("artifact_path", ""))) if isinstance(execution, dict) else Path()
+    with Image.open(artifact) as image:
+        visual = image.format == "PNG" and image.size == (360, 360)
+    return bool(plan) and plan[0]["action"] == "generate_python_heart" and "本机 Python" in reply and visual and payload.get("writes_project") is False
 
 
 def _project_push_route() -> bool:
@@ -107,9 +112,10 @@ async def _computer_control_route(runner: LocalPythonExampleRunner) -> bool:
 
 
 async def _quick_routes() -> bool:
-    runner = LocalPythonExampleRunner()
-    checks = [await _code_example_route(runner), await _ui_question_route(runner), await _ai_creation_route(runner), await _computer_control_route(runner)]
-    return all(checks)
+    with TemporaryDirectory() as artifact_dir:
+        runner = LocalPythonExampleRunner(artifact_dir=Path(artifact_dir))
+        checks = [await _code_example_route(runner), await _ui_question_route(runner), await _ai_creation_route(runner), await _computer_control_route(runner)]
+        return all(checks)
 
 
 def _workspace_sync(root: Path) -> bool:

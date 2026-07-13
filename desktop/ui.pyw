@@ -1,12 +1,15 @@
 import threading
 import time
-from tkinter import BooleanVar, Button, Checkbutton, Entry, Frame, Label, Tk, Text, END, WORD
+import re
+from pathlib import Path
+from tkinter import BooleanVar, Button, Checkbutton, Entry, Frame, Label, PhotoImage, TclError, Tk, Text, END, WORD
 
 from backend_bridge import request
 from memory_window import MemoryWindow
 from sky_theme import BLUE, CARD, INK, MUTED, SKY, SkyHeader
 
 SESSION = f"desktop_{int(time.time())}"
+ARTIFACT_DIR = Path(__file__).resolve().parents[1] / "backend" / "runtime_artifacts"
 TASK_LABELS = {"planned": "已计划", "running": "运行中", "verified": "已验证", "completed": "已完成", "needs_attention": "待处理", "failed": "失败"}
 
 
@@ -17,6 +20,7 @@ class FengqingApp:
         self._fit_window()
         self.mode = "chat"
         self.allow_write = BooleanVar(value=False)
+        self.artifacts: list[PhotoImage] = []
         self._build()
         self._status()
         self._say("风轻思念浓", "我在。对话里需要检查、测试或推进项目时，我会受控调用自己的智能体。")
@@ -115,7 +119,8 @@ class FengqingApp:
         payload = self._agent_payload(text) if self.mode == "agent" else self._chat_payload(text)
         data = request("POST", "/api/v1/agent" if self.mode == "agent" else "/api/v1/chat", payload)
         reply = self._agent_text(data) if self.mode == "agent" else str((data or {}).get("reply", "连接中断。"))
-        self.root.after(0, lambda: self._say("风轻思念浓", reply))
+        artifact = _agent_artifact(data) if self.mode == "agent" else _reply_artifact(reply)
+        self.root.after(0, lambda: self._say("风轻思念浓", reply, artifact))
 
     def _agent_payload(self, text: str) -> dict[str, object]:
         return {"instruction": text, "allow_write": self.allow_write.get()}
@@ -150,10 +155,23 @@ class FengqingApp:
             lines.append(f"第一步：{result['first_sprint'].get('name')}")
         return "\n".join(lines)
 
-    def _say(self, who: str, text: str) -> None:
+    def _say(self, who: str, text: str, artifact: str = "") -> None:
         self.body.insert(END, f"{who}\n", "who")
+        self._insert_artifact(artifact)
         self.body.insert(END, f"{text}\n\n", "line")
         self.body.see(END)
+
+    def _insert_artifact(self, value: str) -> None:
+        path = Path(value)
+        if path.suffix.lower() != ".png" or not path.is_file() or not _is_runtime_artifact(path):
+            return
+        try:
+            image = PhotoImage(file=str(path))
+        except TclError:
+            return
+        self.artifacts.append(image)
+        self.body.image_create(END, image=image, padx=12, pady=8)
+        self.body.insert(END, "\n", "line")
 
 
 def _memory_detail(data: dict[str, object]) -> str:
@@ -166,3 +184,24 @@ def _code_example_reply(result: dict[str, object]) -> str:
     first = rows[0].get("result", {}) if rows and isinstance(rows[0], dict) else {}
     reply = first.get("reply") if isinstance(first, dict) else None
     return reply if isinstance(reply, str) and first.get("mode") in {"code_example", "executed_python_example"} else ""
+
+
+def _agent_artifact(data: dict[str, object] | None) -> str:
+    result = (data or {}).get("result", {})
+    rows = result.get("results", []) if isinstance(result, dict) else []
+    first = rows[0].get("result", {}) if rows and isinstance(rows[0], dict) else {}
+    execution = first.get("execution", {}) if isinstance(first, dict) else {}
+    path = execution.get("artifact_path", "") if isinstance(execution, dict) else ""
+    return path if isinstance(path, str) else ""
+
+
+def _reply_artifact(reply: str) -> str:
+    match = re.search(r"^image=(.+\.png)$", reply, flags=re.MULTILINE)
+    return match.group(1).strip() if match else ""
+
+
+def _is_runtime_artifact(path: Path) -> bool:
+    try:
+        return path.resolve().is_relative_to(ARTIFACT_DIR.resolve())
+    except OSError:
+        return False
