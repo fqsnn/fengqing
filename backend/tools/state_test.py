@@ -61,7 +61,7 @@ async def _task_failure(root: Path) -> bool:
 
 
 async def _code_example_route(runner: LocalPythonExampleRunner) -> bool:
-    plan = direct_plan("写一段 Python 爱心代码")
+    plan = direct_plan("写一个爱心代码")
     reply = await quick_reply("写一段 Python 爱心代码", runner) or ""
     payload = heart_reply(await runner.run_heart())
     execution = payload.get("execution", {})
@@ -90,6 +90,13 @@ def _empty_error_fails() -> bool:
     )
     steps = progress.get("steps", [])
     return progress.get("passed") is False and isinstance(steps, list) and steps[0].get("status") == "failed"
+
+
+def _visual_progress_is_honest() -> bool:
+    plan = [{"action": "generate_python_heart"}]
+    results = [{"step": plan[0], "result": {"passed": True, "reply": "image"}}]
+    progress = summarize_agent_progress(plan, results, True)
+    return "临时运行，不写入项目" in str(progress.get("summary")) and "项目源码未被修改" in str(progress.get("next"))
 
 
 async def _ui_question_route(runner: LocalPythonExampleRunner) -> bool:
@@ -154,6 +161,7 @@ def main() -> int:
     passed = passed and _project_push_route()
     passed = passed and _web_route()
     passed = passed and _empty_error_fails()
+    passed = passed and _visual_progress_is_honest()
     passed = passed and agent_intent("写一段 Python 爱心代码") is None
     passed = passed and agent_intent("修改项目代码") == "write"
     passed = passed and agent_intent("请运行测试") == "read"
