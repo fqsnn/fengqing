@@ -12,10 +12,10 @@ MEMORY_FILE = "personal_memory.md"
 
 class MarkdownContextRecall(ContextRecallPort):
     def __init__(self, folder: Path, workspace_folder: Path | None = None) -> None:
-        folders = [folder]
+        sources = [(folder, False)]
         if workspace_folder and workspace_folder.resolve() != folder.resolve():
-            folders.append(workspace_folder)
-        self.folders = tuple(folders)
+            sources.append((workspace_folder, True))
+        self.sources = tuple(sources)
 
     def recall(self, query: str) -> str | None:
         return self._reader().recall(query)
@@ -24,7 +24,7 @@ class MarkdownContextRecall(ContextRecallPort):
         return self._reader().relevant(query)
 
     def _reader(self) -> LocalContextRecall:
-        context = "\n\n".join(load_context(folder) for folder in self.folders)
+        context = "\n\n".join(load_context(folder, recursive) for folder, recursive in self.sources)
         return LocalContextRecall(context)
 
 

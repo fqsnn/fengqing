@@ -113,7 +113,7 @@ WORKSPACE_CONTEXT_DIR=C:/path/to/read-only-workspace
 
 私人记忆不会固定复制进启动提示，而是在每轮对话中动态检索相关原话，因此修改或删除后立即生效。桌面客户端的“记忆”入口负责管理，“历史”入口显示最近的智能体执行和记忆变更。
 
-`WORKSPACE_CONTEXT_DIR` 是额外的只读知识入口。AI 会在每次相关请求时重新读取其中的 Markdown 文件，因此保存后下一轮对话即可使用；目录内容不会被复制进公开仓库。远程模型仍受 `PRIVATE_CONTEXT_ALLOW_REMOTE=false` 约束。
+`WORKSPACE_CONTEXT_DIR` 是额外的只读知识入口。AI 会在每次相关请求时递归读取其中及其子目录的 Markdown 文件，因此保存后下一轮对话即可使用；目录内容不会被复制进公开仓库。远程模型仍受 `PRIVATE_CONTEXT_ALLOW_REMOTE=false` 约束。
 
 ## 安全边界
 

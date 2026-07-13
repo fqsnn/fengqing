@@ -2,14 +2,16 @@ import os
 from pathlib import Path
 
 
-def load_context(folder: Path) -> str:
+def load_context(folder: Path, recursive: bool = False) -> str:
     if not folder.exists():
         return ""
     chunks: list[str] = []
-    for path in sorted(folder.glob("*.md")):
+    paths = folder.rglob("*.md") if recursive else folder.glob("*.md")
+    for path in sorted(paths):
         text = path.read_text(encoding="utf-8").strip()
         if text:
-            chunks.append(f"## {path.stem}\n{text}")
+            name = path.relative_to(folder).with_suffix("").as_posix()
+            chunks.append(f"## {name}\n{text}")
     return "\n\n".join(chunks)
 
 

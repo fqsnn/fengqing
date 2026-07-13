@@ -24,8 +24,8 @@ async def _rejects_blank(admin: MarkdownMemoryAdmin, memory_id: str) -> bool:
 
 def _workspace_sync(root: Path) -> bool:
     workspace = root / "workspace"
-    workspace.mkdir()
-    note = workspace / "balance.md"
+    note = workspace / "nested" / "balance.md"
+    note.parent.mkdir(parents=True)
     note.write_text("# 均衡\n\n> 我要在均衡里该强的时候强，该弱的时候弱。\n", encoding="utf-8")
     recall = MarkdownContextRecall(root / "private", workspace)
     first = "该强的时候强" in recall.relevant("我想在均衡里怎样调整强弱？")
