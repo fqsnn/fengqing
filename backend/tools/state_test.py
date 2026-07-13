@@ -3,6 +3,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from app.core.agent_gateway import agent_intent, delegated_instruction
+from app.core.agent_replies import python_heart_reply
+from app.core.orchestrator import _accepts_plan
+from app.core.planner import direct_plan
+from app.core.quick_replies import quick_reply
 from app.infrastructure.activity_history import JsonlActivityHistory
 from app.infrastructure.private_memory import MarkdownContextRecall, MarkdownMemoryAdmin
 from app.infrastructure.task_ledger import JsonlTaskLedger
@@ -52,6 +56,37 @@ async def _task_failure(root: Path) -> bool:
         return bool(running and failed) and failed.get("status") == "failed"
 
 
+def _code_example_route() -> bool:
+    plan = direct_plan("写一段 Python 爱心代码")
+    reply = quick_reply("写一段 Python 爱心代码") or ""
+    payload = python_heart_reply()
+    return bool(plan) and plan[0]["action"] == "generate_python_heart" and "def heart" in reply and payload.get("writes_project") is False
+
+
+def _project_push_route() -> bool:
+    plan = direct_plan("继续推进你自己的项目")
+    return bool(plan) and plan[0]["action"] == "self_program_once" and agent_intent("继续推进你自己的项目") == "write"
+
+
+def _ui_question_route() -> bool:
+    plan = direct_plan("你可以改一下你自己的 UI 吗")
+    reply = quick_reply("你可以改一下你自己的 UI 吗") or ""
+    return bool(plan) and plan[0]["action"] == "explain_ui_change" and "不会擅自改界面" in reply
+
+
+def _ai_creation_route() -> bool:
+    plan = direct_plan("你可以自己创造 AI 吗")
+    reply = quick_reply("你可以自己创造 AI 吗") or ""
+    fallback = [{"id": "analyze", "action": "analyze_code", "params": {}}]
+    return bool(plan) and plan[0]["action"] == "explain_ai_creation" and "受控的本地 AI 系统" in reply and not _accepts_plan("你可以自己创造 AI 吗", fallback)
+
+
+def _computer_control_route() -> bool:
+    plan = direct_plan("你可以自动操作电脑吗")
+    reply = quick_reply("你可以自动操作电脑吗") or ""
+    return bool(plan) and plan[0]["action"] == "explain_computer_control" and "不会暗中点击" in reply
+
+
 def _workspace_sync(root: Path) -> bool:
     workspace = root / "workspace"
     note = workspace / "nested" / "balance.md"
@@ -84,6 +119,13 @@ def main() -> int:
     with TemporaryDirectory() as temporary:
         root = Path(temporary)
         passed = asyncio.run(_exercise(root)) and asyncio.run(_task_lifecycle(root)) and asyncio.run(_task_failure(root)) and _workspace_sync(root)
+    passed = passed and _code_example_route()
+    passed = passed and _project_push_route()
+    passed = passed and _ui_question_route()
+    passed = passed and _ai_creation_route()
+    passed = passed and _computer_control_route()
+    passed = passed and agent_intent("写一段 Python 爱心代码") is None
+    passed = passed and agent_intent("修改项目代码") == "write"
     passed = passed and agent_intent("请运行测试") == "read"
     passed = passed and delegated_instruction("继续推进AI项目", "write").startswith("自己编程自己")
     print(f"state_test={'pass' if passed else 'fail'}")

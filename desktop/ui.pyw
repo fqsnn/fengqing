@@ -132,6 +132,9 @@ class FengqingApp:
         return self._format_agent_result(first if isinstance(first, dict) else {})
 
     def _format_visible_agent(self, result: dict[str, object]) -> str:
+        code = _code_example_reply(result)
+        if code:
+            return code
         visible = result["visible_progress"]
         lines = [str(visible.get("summary", "")), f"下一步：{visible.get('next', '')}"]
         for item in visible.get("steps", []) if isinstance(visible.get("steps"), list) else []:
@@ -156,3 +159,10 @@ class FengqingApp:
 def _memory_detail(data: dict[str, object]) -> str:
     item = data.get("memory") or data.get("after") or data.get("before") or {}
     return str(item.get("text", "")) if isinstance(item, dict) else ""
+
+
+def _code_example_reply(result: dict[str, object]) -> str:
+    rows = result.get("results", [])
+    first = rows[0].get("result", {}) if rows and isinstance(rows[0], dict) else {}
+    reply = first.get("reply") if isinstance(first, dict) else None
+    return reply if isinstance(reply, str) and first.get("mode") == "code_example" else ""

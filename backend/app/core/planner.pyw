@@ -4,7 +4,8 @@ import re
 from .ports import JsonMap
 
 ACTIONS = (
-    "analyze_code", "review_code", "improve_code", "read_file", "run_tests", "run_quality_commands",
+    "analyze_code", "review_code", "improve_code", "read_file", "run_tests", "run_quality_commands", "generate_python_heart",
+    "explain_ui_change", "explain_ai_creation", "explain_computer_control", "explain_agent_scope",
     "web_search", "explain_dual_loop", "explain_self_change", "explain_self_programming", "explain_codex_like",
     "explain_codex_acceleration", "explain_identity_transfer", "explain_runtime", "explain_security_boundary",
     "explain_self_awareness", "explain_mobile_access", "explain_hybrid_power", "explain_china_layer",
@@ -39,6 +40,11 @@ RESOURCE_WORDS = ("实时调度", "资源分配", "低延迟", "无延迟", "多
 LIFE_WORDS = ("生活怪怪", "很奇怪", "状态不对", "不真实", "怪怪的", "最近的生活")
 SELF_THINK_WORDS = ("自己解离", "思考自己", "自己思考自己", "自我对话", "分视角")
 GAME_COUPLING_WORDS = ("推进ai本身", "推进 ai 本身", "游戏项目", "窗边的雨城", "顺带", "互相喂养")
+HEART_WORDS = ("爱心", "心形")
+PROJECT_PUSH_WORDS = ("继续推进你自己的项目", "继续推进自己的项目", "继续推进项目", "推进你自己的项目", "推进自己的项目")
+UI_CHANGE_WORDS = ("你自己的ui", "自己的ui", "自身ui", "你自己的界面", "自己的界面")
+AI_CREATION_WORDS = ("自己创造ai", "自己创建ai", "创造ai", "创建ai", "做一个ai")
+COMPUTER_CONTROL_WORDS = ("自动操作电脑", "操作电脑", "控制电脑", "控制系统", "操作系统")
 
 SPECIAL_RULES = (
     (VISIBLE_PROGRESS_WORDS, "visible_progress", "explain_visible_progress"),
@@ -59,7 +65,33 @@ SPECIAL_RULES = (
 
 def direct_plan(instruction: str) -> list[JsonMap]:
     text = instruction.lower()
-    return _mobile_plan(instruction, text) or _evolve_plan(instruction) or _special_plan(text) or _code_plan(instruction)
+    return _example_plan(text) or _ui_change_plan(text) or _ai_creation_plan(text) or _computer_control_plan(text) or _project_push_plan(instruction, text) or _mobile_plan(instruction, text) or _evolve_plan(instruction) or _special_plan(text) or _code_plan(instruction)
+
+
+def _example_plan(text: str) -> list[JsonMap]:
+    if "python" in text and _has(text, HEART_WORDS):
+        return [_step("python_heart", "generate_python_heart")]
+    return []
+
+
+def _project_push_plan(instruction: str, text: str) -> list[JsonMap]:
+    if _has(text, PROJECT_PUSH_WORDS):
+        return [_step("self_program", "self_program_once", {"instruction": instruction, "max_files": 1})]
+    return []
+
+
+def _ui_change_plan(text: str) -> list[JsonMap]:
+    compact = re.sub(r"\s+", "", text)
+    return [_step("ui_change", "explain_ui_change")] if _has(compact, UI_CHANGE_WORDS) else []
+
+
+def _ai_creation_plan(text: str) -> list[JsonMap]:
+    compact = re.sub(r"\s+", "", text)
+    return [_step("ai_creation", "explain_ai_creation")] if _has(compact, AI_CREATION_WORDS) else []
+
+
+def _computer_control_plan(text: str) -> list[JsonMap]:
+    return [_step("computer_control", "explain_computer_control")] if _has(text, COMPUTER_CONTROL_WORDS) else []
 
 
 def _mobile_plan(instruction: str, text: str) -> list[JsonMap]:

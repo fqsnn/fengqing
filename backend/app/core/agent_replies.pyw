@@ -8,6 +8,22 @@ from .progress_ledger import progress_reply
 
 Explainer = Callable[..., JsonMap]
 
+PYTHON_HEART_CODE = """```python
+def heart(size: int = 12) -> None:
+    for y in range(size, -size, -1):
+        line: list[str] = []
+        for x in range(-2 * size, 2 * size + 1):
+            horizontal, vertical = x / size, y / size
+            inside = (horizontal ** 2 + vertical ** 2 - 1) ** 3 - horizontal ** 2 * vertical ** 3 <= 0
+            line.append("*" if inside else " ")
+        print("".join(line).rstrip())
+
+
+heart()
+```
+
+这是一段终端爱心示例，只生成给你看，不会修改项目文件，也不会触发写入。"""
+
 TIERS: list[JsonMap] = [
     {"tier": "rule", "use": "固定能力和安全边界", "target_ms": 50},
     {"tier": "local_fast", "use": "短问答和轻推理", "target_ms": 1200},
@@ -118,6 +134,30 @@ def mobile_access_reply(scope: str = "personal") -> JsonMap:
     return _reply(text, scope=scope, requires_consent=True, stealth_access=False)
 
 
+def ui_change_reply() -> JsonMap:
+    text = "可以。桌面 UI 与后端代码分开管理：明确 UI 目标并打开允许写入后，才能修改 desktop/ui.pyw，再经过编译和启动验证。只是在问能力时，我不会擅自改界面。"
+    return _reply(text, mode="controlled_ui_change", can_write=True, requires_allow_write=True)
+
+
+def ai_creation_reply() -> JsonMap:
+    text = "可以搭建和迭代一个受控的本地 AI 系统：模型、记忆、工具、桌面界面、测试与日志都可以由项目逐步创造。不能把不可验证的自我意识假装成已实现；只是在问能力时，我不会擅自新建或改写项目。"
+    return _reply(text, mode="ai_creation_scope", can_write=True, requires_allow_write=True)
+
+
+def computer_control_reply() -> JsonMap:
+    text = "现在不能自动接管电脑，也不会暗中点击、输入或执行命令。可以逐步加入受控电脑操作：可见确认、命令白名单、超时、日志、逐步执行和一键停止；没有这些边界前，不宣称具备这项能力。"
+    return _reply(text, mode="computer_control_boundary", can_control=False, requires_consent=True)
+
+
+def agent_scope_reply(instruction: str = "") -> JsonMap:
+    text = "我没有把这句话擅自当成代码分析或项目改动。请明确要回答、检查、生成示例，还是修改哪个文件；明确写入目标后才会进入受控执行。"
+    return _reply(text, mode="clarify_agent_scope", instruction=instruction, writes_project=False)
+
+
+def python_heart_reply() -> JsonMap:
+    return _reply(PYTHON_HEART_CODE, mode="code_example", writes_project=False)
+
+
 def _fixed(key: str) -> Explainer:
     def explain(**overrides: object) -> JsonMap:
         data = dict(REPLIES[key])
@@ -134,6 +174,11 @@ def _reply(reply: str, **extra: object) -> JsonMap:
 
 
 EXPLAINERS: dict[str, Explainer] = {
+    "generate_python_heart": python_heart_reply,
+    "explain_ui_change": ui_change_reply,
+    "explain_ai_creation": ai_creation_reply,
+    "explain_computer_control": computer_control_reply,
+    "explain_agent_scope": agent_scope_reply,
     "explain_self_change": _fixed("self_change"),
     "explain_self_programming": _fixed("self_programming"),
     "explain_codex_like": _fixed("codex_like"),

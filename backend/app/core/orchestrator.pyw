@@ -86,8 +86,12 @@ class HybridOrchestrator(AgentRunnerPort):
         if direct:
             return direct
         prompt = f"Allowed actions: {list(ACTIONS)}. Return JSON array only. User: {instruction}"
-        response = await self.llm.generate_response([{"role": "user", "content": prompt}])
-        return parse_plan(response) or [{"id": "analyze", "action": "analyze_code", "params": {}}]
+        try:
+            response = await self.llm.generate_response([{"role": "user", "content": prompt}])
+        except Exception:
+            return _scope_step(instruction)
+        plan = parse_plan(response)
+        return plan if _accepts_plan(instruction, plan) else _scope_step(instruction)
 
     async def _run_step(self, step: JsonMap, allow_write: bool) -> object:
         action, params = str(step.get("action")), step.get("params", {})
@@ -159,3 +163,15 @@ def _task_status(progress: JsonMap) -> str:
     steps = progress.get("steps", [])
     failed = any(isinstance(step, dict) and step.get("status") == "failed" for step in steps) if isinstance(steps, list) else False
     return "failed" if failed else "needs_attention"
+
+
+def _accepts_plan(instruction: str, plan: list[JsonMap]) -> bool:
+    if not plan:
+        return False
+    if len(plan) != 1 or plan[0].get("action") != "analyze_code":
+        return True
+    return any(word in instruction.lower() for word in ("代码", "项目", "文件", "测试", "检查", "审查", "分析"))
+
+
+def _scope_step(instruction: str) -> list[JsonMap]:
+    return [{"id": "clarify", "action": "explain_agent_scope", "params": {"instruction": instruction}}]

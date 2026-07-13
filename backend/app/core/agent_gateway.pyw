@@ -1,14 +1,22 @@
 from .ports import JsonMap
 
 READ_WORDS = ("检查代码", "审查代码", "分析代码", "分析项目", "检查项目", "运行测试", "跑测试", "质量门", "跑检查", "读文件")
-WRITE_WORDS = ("修改代码", "修复代码", "优化代码", "实现功能", "写代码", "推进ai项目", "推进 ai 项目", "自己改自己", "自己编程自己")
+WRITE_WORDS = ("修改代码", "修改项目代码", "修复代码", "修复项目代码", "优化代码", "优化项目代码", "实现功能", "推进ai项目", "推进 ai 项目", "继续推进项目", "推进你自己的项目", "推进自己的项目", "自己改自己", "自己编程自己")
+CODE_EXAMPLE_WORDS = ("写一段", "写个", "示例代码", "代码示例")
+PROJECT_WORDS = ("项目", "文件", "仓库", "后端", "前端", "代码库", "写入")
 
 
 def agent_intent(text: str) -> str | None:
     lowered = text.lower()
+    if _is_code_example(lowered):
+        return None
     if any(word in lowered for word in WRITE_WORDS):
         return "write"
     return "read" if any(word in lowered for word in READ_WORDS) else None
+
+
+def _is_code_example(text: str) -> bool:
+    return any(word in text for word in CODE_EXAMPLE_WORDS) and not any(word in text for word in PROJECT_WORDS)
 
 
 def delegated_instruction(text: str, intent: str) -> str:
