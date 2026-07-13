@@ -44,7 +44,7 @@ async def _program(agent: CodeAgent, target: list[JsonMap], allow_write: bool) -
         if not isinstance(path, str):
             continue
         try:
-            items.append(await agent.improve(path, allow_write=allow_write))
+            items.append(await agent.improve(path, allow_write=allow_write, verify_commands=False))
         except Exception as exc:
             items.append({"path": path, "changed": False, "error": str(exc)})
     return items

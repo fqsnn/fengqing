@@ -6,7 +6,7 @@ from app.core.context_loader import private_context_for_model
 from app.core.context_recall import LocalContextRecall
 from app.core.conversation_style import natural_reply
 from app.core.entities import Conversation
-from app.main import SYSTEM_PROMPT, app
+from app.main import PUBLIC_CONTEXT, SYSTEM_PROMPT, app
 
 
 def _system_topic_is_ignored() -> bool:
@@ -20,7 +20,8 @@ def _core_behavior_works() -> bool:
     context = '- “我喜欢南京的一号线，因为它是蓝色的。”'
     recall = LocalContextRecall(context).recall("我为什么喜欢南京一号线？")
     remote_safe = private_context_for_model("private", "openai", False) == ""
-    return "\u5357\u4eac\uff1a\u88ab\u751f\u6d3b\u8fc7\u7684\u57ce\u5e02" in SYSTEM_PROMPT and _system_topic_is_ignored() and remote_safe and recall == "因为它是蓝色的。这是你之前亲口告诉我的。"
+    public_context_is_dynamic = "南京：被生活过的城市" in PUBLIC_CONTEXT and "南京：被生活过的城市" not in SYSTEM_PROMPT
+    return public_context_is_dynamic and _system_topic_is_ignored() and remote_safe and recall == "因为它是蓝色的。这是你之前亲口告诉我的。"
 
 
 def main() -> int:

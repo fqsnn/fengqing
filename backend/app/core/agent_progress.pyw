@@ -26,7 +26,7 @@ def _status(result: object) -> str:
         return "done"
     if "error" in result:
         return "failed"
-    if result.get("passed") is False or result.get("rolled_back"):
+    if result.get("passed") is False or result.get("rolled_back") or result.get("restored"):
         return "needs_attention"
     return "passed" if result.get("passed") is True or result.get("reply") else "done"
 

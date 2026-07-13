@@ -8,11 +8,11 @@ LlmMessage = dict[str, str]
 
 class LLMEnginePort(ABC):
     @abstractmethod
-    async def generate_response(self, messages: list[LlmMessage]) -> str:
+    async def generate_response(self, messages: list[LlmMessage], max_output_tokens: int | None = None) -> str:
         raise NotImplementedError
 
     @abstractmethod
-    async def generate_raw(self, prompt: str) -> str:
+    async def generate_raw(self, prompt: str, max_output_tokens: int | None = None) -> str:
         raise NotImplementedError
 
 
@@ -46,7 +46,7 @@ class ShortTermMemoryPort(ABC):
 
 class ReflectionEnginePort(ABC):
     @abstractmethod
-    async def reflect(self, user_input: str, raw_response: str, history: list[LlmMessage]) -> Reflection:
+    async def reflect(self, user_input: str, raw_response: str, history: list[LlmMessage], max_output_tokens: int | None = None) -> Reflection:
         raise NotImplementedError
 
 

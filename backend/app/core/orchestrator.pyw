@@ -9,15 +9,17 @@ from .evolution_flow import controlled_self_evolution
 from .planner import ACTIONS, direct_plan, parse_plan
 from .ports import ActivityHistoryPort, AgentRunnerPort, JsonMap, LLMEnginePort, PythonExampleRunnerPort, TaskLedgerPort, WebSearchPort
 from .python_examples import heart_reply
+from .resource_balance import ResourceBalance, ResourceDecision
 from .self_programming import self_program_once
 from .shared_context import SharedContext
 
 
 class HybridOrchestrator(AgentRunnerPort):
-    def __init__(self, llm: LLMEnginePort, code_agent: CodeAgent, python_runner: PythonExampleRunnerPort, web_search: WebSearchPort | None = None, shared_context: SharedContext | None = None, history: ActivityHistoryPort | None = None, tasks: TaskLedgerPort | None = None) -> None:
+    def __init__(self, llm: LLMEnginePort, code_agent: CodeAgent, python_runner: PythonExampleRunnerPort, resource_balance: ResourceBalance, web_search: WebSearchPort | None = None, shared_context: SharedContext | None = None, history: ActivityHistoryPort | None = None, tasks: TaskLedgerPort | None = None) -> None:
         self.llm = llm
         self.code_agent = code_agent
         self.python_runner = python_runner
+        self.resource_balance = resource_balance
         self.web_search = web_search
         self.shared_context = shared_context
         self.history = history
@@ -30,10 +32,12 @@ class HybridOrchestrator(AgentRunnerPort):
         }
 
     async def execute(self, instruction: str, allow_write: bool = False) -> JsonMap:
-        plan = await self._plan(instruction)
+        operation = "agent_write" if allow_write else "agent_read"
+        decision = self.resource_balance.decide(instruction, operation, allow_write)
+        plan = await self._plan(instruction, decision)
         task = await self._start_task(instruction, plan, allow_write)
         results = await self._results(plan, allow_write)
-        output = _output(plan, results, allow_write)
+        output = _output(plan, results, allow_write, decision)
         task = await self._finish_task(task, output)
         if task:
             output["task"] = task
@@ -85,13 +89,13 @@ class HybridOrchestrator(AgentRunnerPort):
         if self.shared_context:
             self.shared_context.add("agent", self._summary(instruction, output))
 
-    async def _plan(self, instruction: str) -> list[JsonMap]:
+    async def _plan(self, instruction: str, decision: ResourceDecision) -> list[JsonMap]:
         direct = direct_plan(instruction)
         if direct:
             return direct
         prompt = f"Allowed actions: {list(ACTIONS)}. Return JSON array only. User: {instruction}"
         try:
-            response = await self.llm.generate_response([{"role": "user", "content": prompt}])
+            response = await self.llm.generate_response([{"role": "user", "content": prompt}], max_output_tokens=decision.profile.planner_tokens)
         except Exception:
             return _scope_step(instruction)
         plan = parse_plan(response)
@@ -160,9 +164,11 @@ class HybridOrchestrator(AgentRunnerPort):
         return heart_reply(await self.python_runner.run_heart())
 
 
-def _output(plan: list[JsonMap], results: list[JsonMap], allow_write: bool) -> JsonMap:
-    output: JsonMap = {"plan": plan, "results": results, "allow_write": allow_write}
-    output["visible_progress"] = summarize_agent_progress(plan, results, allow_write)
+def _output(plan: list[JsonMap], results: list[JsonMap], allow_write: bool, decision: ResourceDecision) -> JsonMap:
+    visible = summarize_agent_progress(plan, results, allow_write)
+    visible["resource_balance"] = decision.visible()
+    output: JsonMap = {"plan": plan, "results": results, "allow_write": allow_write, "resource_balance": decision.event()}
+    output["visible_progress"] = visible
     return output
 
 

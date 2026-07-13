@@ -5,37 +5,23 @@ from .dual_loop import DUAL_LOOP_SYSTEM, format_search_context, needs_web_search
 from .ports import AgentRunnerPort, ContextRecallPort, EventStorePort, EvolutionEnginePort, LLMEnginePort, PythonExampleRunnerPort, ReflectionEnginePort, ShortTermMemoryPort, WebSearchPort
 from .prompts import DEFAULT_SYSTEM_PROMPT
 from .quick_replies import quick_reply
+from .resource_balance import ResourceBalance, ResourceDecision
 from .shared_context import SharedContext
 
 
 class AICoreService:
     def __init__(
-        self,
-        llm: LLMEnginePort,
-        memory: ShortTermMemoryPort,
-        reflection: ReflectionEnginePort,
-        evolution: EvolutionEnginePort,
-        event_store: EventStorePort,
-        python_runner: PythonExampleRunnerPort,
-        system_prompt: str = DEFAULT_SYSTEM_PROMPT,
-        shared_context: SharedContext | None = None,
-        web_search: WebSearchPort | None = None,
-        context_recall: ContextRecallPort | None = None,
-        agent_runner: AgentRunnerPort | None = None,
-        allow_private_model_context: bool = True,
+        self, llm: LLMEnginePort, memory: ShortTermMemoryPort, reflection: ReflectionEnginePort, evolution: EvolutionEnginePort,
+        event_store: EventStorePort, python_runner: PythonExampleRunnerPort, resource_balance: ResourceBalance,
+        system_prompt: str = DEFAULT_SYSTEM_PROMPT, shared_context: SharedContext | None = None, web_search: WebSearchPort | None = None,
+        context_recall: ContextRecallPort | None = None, public_context_recall: ContextRecallPort | None = None,
+        agent_runner: AgentRunnerPort | None = None, allow_private_model_context: bool = True,
     ) -> None:
-        self.llm = llm
-        self.memory = memory
-        self.reflection = reflection
-        self.evolution = evolution
-        self.event_store = event_store
-        self.python_runner = python_runner
-        self.system_prompt = system_prompt
-        self.shared_context = shared_context
-        self.web_search = web_search
-        self.context_recall = context_recall
-        self.agent_runner = agent_runner
-        self.allow_private_model_context = allow_private_model_context
+        self.llm, self.memory, self.reflection, self.evolution = llm, memory, reflection, evolution
+        self.event_store, self.python_runner, self.resource_balance = event_store, python_runner, resource_balance
+        self.system_prompt, self.shared_context, self.web_search = system_prompt, shared_context, web_search
+        self.context_recall, self.public_context_recall = context_recall, public_context_recall
+        self.agent_runner, self.allow_private_model_context = agent_runner, allow_private_model_context
         self._reflection_buffer: list[Reflection] = []
         self.evolution_window = 3
         self.evolution_threshold = 0.7
@@ -43,19 +29,21 @@ class AICoreService:
     async def process_user_input(self, session_id: str, user_input: str, allow_agent_write: bool = False) -> str:
         conv = await self._conversation(session_id)
         conv.add_message("user", user_input)
-        delegated = await self._agent_reply(session_id, conv, user_input, allow_agent_write)
+        operation, intent = self._operation(user_input)
+        decision = self.resource_balance.decide(user_input, operation, allow_agent_write)
+        await self._record_balance(session_id, decision)
+        delegated = await self._agent_reply(session_id, conv, user_input, intent, allow_agent_write)
         if delegated:
             return delegated
         fast = await self._fast_reply(session_id, conv, user_input)
         if fast:
             return fast
         try:
-            return await self._model_reply(session_id, conv, user_input)
+            return await self._model_reply(session_id, conv, user_input, decision)
         except Exception as exc:
             return await self._llm_failure(session_id, conv, user_input, exc)
 
-    async def _agent_reply(self, session_id: str, conv: Conversation, user_input: str, allow_write: bool) -> str:
-        intent = agent_intent(user_input)
+    async def _agent_reply(self, session_id: str, conv: Conversation, user_input: str, intent: str | None, allow_write: bool) -> str:
         if not intent or not self.agent_runner:
             return ""
         result = await self.agent_runner.execute(delegated_instruction(user_input, intent), allow_write=allow_write)
@@ -93,9 +81,9 @@ class AICoreService:
         await self._save_answer(session_id, conv, user_input, reply)
         return reply
 
-    async def _model_reply(self, session_id: str, conv: Conversation, user_input: str) -> str:
-        raw = await self._draft(session_id, conv, user_input)
-        reflection = await self._reflect(conv, user_input, raw)
+    async def _model_reply(self, session_id: str, conv: Conversation, user_input: str, decision: ResourceDecision) -> str:
+        raw = await self._draft(session_id, conv, user_input, decision)
+        reflection = await self._reflect(conv, user_input, raw, decision)
         await self._record_reflection(session_id, raw, reflection)
         final = polish_reply(user_input, reflection.revised_response or raw, conv)
         await self._save_answer(session_id, conv, user_input, final)
@@ -108,26 +96,37 @@ class AICoreService:
         await self._save_answer(session_id, conv, user_input, reply)
         return reply
 
-    def _llm_messages(self, conv: Conversation, private_context: str) -> list[dict[str, str]]:
+    def _llm_messages(self, conv: Conversation, private_context: str, public_context: str, decision: ResourceDecision) -> list[dict[str, str]]:
         messages = conv.to_llm_format()
-        messages.insert(1, {"role": "system", "content": DUAL_LOOP_SYSTEM})
+        head, tail = messages[:1], messages[1:][-decision.profile.history_messages :]
+        extra = [{"role": "system", "content": DUAL_LOOP_SYSTEM}]
         if private_context:
-            messages.insert(1, {"role": "system", "content": f"本机私人记忆中与本轮相关的原话：\n{private_context}"})
+            extra.append({"role": "system", "content": f"本机私人记忆中与本轮相关的原话：\n{private_context}"})
+        if public_context:
+            extra.append({"role": "system", "content": f"与本轮相关的公开创作上下文：\n{public_context}"})
         if self.shared_context:
-            context = self.shared_context.render()
+            context = self.shared_context.render(decision.profile.context_chars)
             if context:
-                messages.insert(1, {"role": "system", "content": context})
-        return messages
+                extra.append({"role": "system", "content": context})
+        return head + extra + tail
 
-    async def _draft(self, session_id: str, conv: Conversation, user_input: str) -> str:
-        private_context = self._private_context(user_input)
-        await self.event_store.append_event(session_id, "DUAL_LOOP", {"mode": "forward_reverse_prompt", "web": False})
-        return await self.llm.generate_response(self._llm_messages(conv, private_context))
+    async def _draft(self, session_id: str, conv: Conversation, user_input: str, decision: ResourceDecision) -> str:
+        private_context = self._private_context(user_input, decision)
+        public_context = self._public_context(user_input, decision)
+        event = {"mode": "forward_reverse_prompt", "web": False, "resource_balance": decision.event()}
+        await self.event_store.append_event(session_id, "DUAL_LOOP", event)
+        messages = self._llm_messages(conv, private_context, public_context, decision)
+        return await self.llm.generate_response(messages, max_output_tokens=decision.profile.output_tokens)
 
-    def _private_context(self, user_input: str) -> str:
+    def _private_context(self, user_input: str, decision: ResourceDecision) -> str:
         if not self.allow_private_model_context or not self.context_recall:
             return ""
-        return self.context_recall.relevant(user_input)
+        return _clip(self.context_recall.relevant(user_input), decision.profile.context_chars)
+
+    def _public_context(self, user_input: str, decision: ResourceDecision) -> str:
+        if not self.public_context_recall:
+            return ""
+        return _clip(self.public_context_recall.relevant(user_input), decision.profile.context_chars)
 
     async def _conversation(self, session_id: str) -> Conversation:
         conv = await self.memory.load(session_id) or Conversation(session_id=session_id)
@@ -135,9 +134,18 @@ class AICoreService:
             conv.add_message("system", self.system_prompt)
         return conv
 
-    async def _reflect(self, conv: Conversation, user_input: str, raw: str) -> Reflection:
-        history = [{"role": m.role, "content": m.content} for m in conv.messages[-3:]]
-        return await self.reflection.reflect(user_input, raw, history)
+    async def _reflect(self, conv: Conversation, user_input: str, raw: str, decision: ResourceDecision) -> Reflection:
+        history = [{"role": m.role, "content": m.content} for m in conv.messages[-decision.profile.history_messages :]]
+        return await self.reflection.reflect(user_input, raw, history, max_output_tokens=decision.profile.reflection_tokens)
+
+    def _operation(self, user_input: str) -> tuple[str, str | None]:
+        intent = agent_intent(user_input)
+        if intent:
+            return ("agent_write" if intent == "write" else "agent_read"), intent
+        return ("web", None) if needs_web_search(user_input) else ("chat", None)
+
+    async def _record_balance(self, session_id: str, decision: ResourceDecision) -> None:
+        await self.event_store.append_event(session_id, "RESOURCE_BALANCE", decision.event())
 
     async def _record_reflection(self, session_id: str, raw: str, reflection: Reflection) -> None:
         await self.event_store.append_event(session_id, "REFLECTION", self._reflection_event(raw, reflection))
@@ -173,3 +181,7 @@ class AICoreService:
             return
         self.system_prompt = new_prompt
         await self.event_store.append_event(session_id, "EVOLUTION", {"new_prompt": new_prompt})
+
+
+def _clip(text: str, max_chars: int) -> str:
+    return text.strip()[:max_chars]

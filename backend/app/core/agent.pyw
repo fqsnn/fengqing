@@ -3,16 +3,19 @@ from pathlib import Path
 from shutil import copy
 
 from .code_prompts import extract_code, file_stats, improve_prompt, review_prompt, static_review
+from .command_runner import run_quality_commands
 from .ports import LLMEnginePort
+from .resource_balance import ResourceBalance
 from .source_tree import SourceTree
 
 
 class CodeAgent:
     MAX_FILE_CHARS = 12000
 
-    def __init__(self, llm: LLMEnginePort, target_dir: str | Path) -> None:
+    def __init__(self, llm: LLMEnginePort, target_dir: str | Path, resource_balance: ResourceBalance) -> None:
         self.llm = llm
         self.tree = SourceTree(target_dir)
+        self.resource_balance = resource_balance
 
     def analyze_project(self) -> dict[str, object]:
         rows = self._rows()
@@ -37,12 +40,12 @@ class CodeAgent:
             reviews.append(review)
         return {"reviewed": len(reviews), "items": reviews}
 
-    async def improve(self, path: str, allow_write: bool = False) -> dict[str, object]:
+    async def improve(self, path: str, allow_write: bool = False, verify_commands: bool = True) -> dict[str, object]:
         proposal = await self._propose_improvement(path)
         if not allow_write:
             preview = str(proposal["code"])[:2000]
             return {"path": proposal["path"], "changed": False, "dry_run": True, "preview": preview}
-        return self._write_proposal(path, proposal)
+        return await self._write_proposal(path, proposal, verify_commands)
 
     def validate_project(self) -> dict[str, object]:
         errors = []
@@ -67,7 +70,8 @@ class CodeAgent:
         item = self.read_file(str(path))
         try:
             prompt = review_prompt(str(item["path"]), str(item["content"]))
-            review = await self.llm.generate_response([{"role": "user", "content": prompt}])
+            decision = self.resource_balance.decide(prompt, operation="code_review")
+            review = await self.llm.generate_response([{"role": "user", "content": prompt}], max_output_tokens=decision.profile.output_tokens)
         except Exception as exc:
             review = static_review(str(item["content"]), exc)
         return {"path": item["path"], "review": review}
@@ -79,18 +83,39 @@ class CodeAgent:
 
     async def _propose_improvement(self, path: str) -> dict[str, object]:
         item = self.read_file(path)
-        prompt = improve_prompt(str(item["path"]), str(item["content"]))
-        code = extract_code(await self.llm.generate_response([{"role": "user", "content": prompt}]))
+        content = str(item["content"])
+        prompt = improve_prompt(str(item["path"]), content)
+        decision = self.resource_balance.decide(prompt, operation="code_write")
+        code = extract_code(await self.llm.generate_response([{"role": "user", "content": prompt}], max_output_tokens=decision.code_output_tokens(len(content))))
         compile(code, str(item["path"]), "exec")
         return {"path": item["path"], "code": code}
 
-    def _write_proposal(self, path: str, proposal: dict[str, object]) -> dict[str, object]:
+    async def _write_proposal(self, path: str, proposal: dict[str, object], verify_commands: bool) -> dict[str, object]:
+        file_path, backup = self._apply_proposal(path, proposal)
+        validation = self.validate_project()
+        commands = await self._quality(validation, verify_commands)
+        if self._verified(validation, commands, verify_commands):
+            return self._changed(proposal, backup, validation, commands)
+        return await self._restore(file_path, backup, proposal, validation, commands, verify_commands)
+
+    def _apply_proposal(self, path: str, proposal: dict[str, object]) -> tuple[Path, Path]:
         file_path = self.tree.safe_path(path)
         backup = self.tree.backup_path(file_path, int(time.time()))
         copy(file_path, backup)
         file_path.write_text(proposal["code"], encoding="utf-8")
-        validation = self.validate_project()
-        if not validation["passed"]:
-            copy(backup, file_path)
-            return {"path": proposal["path"], "changed": False, "restored": True, "validation": validation}
-        return {"path": proposal["path"], "changed": True, "backup": str(backup), "validation": validation}
+        return file_path, backup
+
+    async def _quality(self, validation: dict[str, object], verify_commands: bool) -> dict[str, object]:
+        return await run_quality_commands() if validation["passed"] and verify_commands else {}
+
+    def _verified(self, validation: dict[str, object], commands: dict[str, object], verify_commands: bool) -> bool:
+        return bool(validation["passed"]) and (not verify_commands or bool(commands.get("passed")))
+
+    def _changed(self, proposal: dict[str, object], backup: Path, validation: dict[str, object], commands: dict[str, object]) -> dict[str, object]:
+        return {"path": proposal["path"], "changed": True, "backup": str(backup), "validation": validation, "commands": commands}
+
+    async def _restore(self, file_path: Path, backup: Path, proposal: dict[str, object], validation: dict[str, object], commands: dict[str, object], verify_commands: bool) -> dict[str, object]:
+        copy(backup, file_path)
+        restored_validation = self.validate_project()
+        restored_commands = await run_quality_commands() if verify_commands else {}
+        return {"path": proposal["path"], "changed": False, "restored": True, "validation": restored_validation, "commands": restored_commands, "failed_validation": validation, "failed_commands": commands}

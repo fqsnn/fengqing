@@ -30,4 +30,5 @@ def _capabilities() -> JsonMap:
         "python_execution": True,
         "visual_python_execution": True,
         "web_search": os.getenv("WEB_SEARCH_ENABLED", "false").lower().strip() == "true",
+        "resource_balance": True,
     }

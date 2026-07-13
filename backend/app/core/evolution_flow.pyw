@@ -1,20 +1,29 @@
 from .agent import CodeAgent
 from .ports import JsonMap
+from .self_programming import self_program_once
 
 
 async def controlled_self_evolution(agent: CodeAgent, allow_write: bool, max_files: int) -> JsonMap:
     analysis = agent.analyze_project()
+    return await _write(agent, analysis, max_files) if allow_write else await _preview(agent, analysis, max_files)
+
+
+async def _write(agent: CodeAgent, analysis: JsonMap, max_files: int) -> JsonMap:
+    result = await self_program_once(agent, True, "受控自我进化", max_files)
+    result["mode"] = "controlled_self_evolution"
+    result["phases"] = _phases(analysis, result["before"], result["after"])
+    return result
+
+
+async def _preview(agent: CodeAgent, analysis: JsonMap, max_files: int) -> JsonMap:
     before = agent.validate_project()
-    items = await agent._run_self_improvement_cycle(allow_write=allow_write, max_files=max_files)
+    items = await agent._run_self_improvement_cycle(allow_write=False, max_files=max_files)
     after = agent.validate_project()
-    return {
-        "mode": "controlled_self_evolution",
-        "reply": _reply(allow_write, items, after),
-        "phases": _phases(analysis, before, after),
-        "before": before,
-        "items": items,
-        "after": after,
-    }
+    return _payload(analysis, before, items, after)
+
+
+def _payload(analysis: JsonMap, before: JsonMap, items: list[dict[str, object]], after: JsonMap) -> JsonMap:
+    return {"mode": "controlled_self_evolution", "reply": _reply(False, items, after), "phases": _phases(analysis, before, after), "before": before, "items": items, "after": after}
 
 
 def _reply(allow_write: bool, items: list[dict[str, object]], after: JsonMap) -> str:

@@ -100,6 +100,14 @@ def _visual_progress_is_honest() -> bool:
     return "临时运行，不写入项目" in str(progress.get("summary")) and "项目源码未被修改" in str(progress.get("next"))
 
 
+def _restored_write_needs_attention() -> bool:
+    plan = [{"action": "improve_code"}]
+    results = [{"step": plan[0], "result": {"restored": True, "reply": "恢复完成"}}]
+    progress = summarize_agent_progress(plan, results, True)
+    steps = progress.get("steps", [])
+    return progress.get("passed") is False and isinstance(steps, list) and steps[0].get("status") == "needs_attention"
+
+
 def _runtime_probe_states() -> bool:
     checked_at = "2026-07-13T00:00:00+00:00"
     ready = ollama_status_from_payload("qwen2.5:0.5b", {"models": [{"name": "qwen2.5:0.5b"}]}, checked_at)
@@ -162,20 +170,20 @@ async def _exercise(root: Path) -> bool:
     return bool(deleted) and not await admin.list_facts() and [item["kind"] for item in events] == ["memory_deleted", "memory_updated", "memory_added"]
 
 
+def _checks() -> bool:
+    return all((
+        asyncio.run(_quick_routes()), _project_push_route(), _web_route(), _empty_error_fails(),
+        _visual_progress_is_honest(), _restored_write_needs_attention(), _runtime_probe_states(),
+        agent_intent("写一段 Python 爱心代码") is None, agent_intent("修改项目代码") == "write",
+        agent_intent("请运行测试") == "read", delegated_instruction("继续推进AI项目", "write").startswith("自己编程自己"),
+    ))
+
+
 def main() -> int:
     with TemporaryDirectory() as temporary:
         root = Path(temporary)
-        passed = asyncio.run(_exercise(root)) and asyncio.run(_task_lifecycle(root)) and asyncio.run(_task_failure(root)) and _workspace_sync(root)
-    passed = passed and asyncio.run(_quick_routes())
-    passed = passed and _project_push_route()
-    passed = passed and _web_route()
-    passed = passed and _empty_error_fails()
-    passed = passed and _visual_progress_is_honest()
-    passed = passed and _runtime_probe_states()
-    passed = passed and agent_intent("写一段 Python 爱心代码") is None
-    passed = passed and agent_intent("修改项目代码") == "write"
-    passed = passed and agent_intent("请运行测试") == "read"
-    passed = passed and delegated_instruction("继续推进AI项目", "write").startswith("自己编程自己")
+        local = asyncio.run(_exercise(root)) and asyncio.run(_task_lifecycle(root)) and asyncio.run(_task_failure(root)) and _workspace_sync(root)
+    passed = local and _checks()
     print(f"state_test={'pass' if passed else 'fail'}")
     return 0 if passed else 1
 

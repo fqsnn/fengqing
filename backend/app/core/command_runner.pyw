@@ -21,6 +21,7 @@ COMMANDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("compile_all", ("-c", COMPILE_SCRIPT)),
     ("smoke_test", ("-m", "tools.smoke_test")),
     ("state_test", ("-m", "tools.state_test")),
+    ("resource_balance_test", ("-m", "tools.resource_balance_test")),
 )
 
 

@@ -9,8 +9,8 @@ class SelfReflectionEngine:
     def __init__(self, llm: LLMEnginePort) -> None:
         self.llm = llm
 
-    async def reflect(self, user_input: str, raw_response: str, history: list[LlmMessage]) -> Reflection:
-        result = await self.llm.generate_raw(self._prompt(user_input, raw_response, history))
+    async def reflect(self, user_input: str, raw_response: str, history: list[LlmMessage], max_output_tokens: int | None = None) -> Reflection:
+        result = await self.llm.generate_raw(self._prompt(user_input, raw_response, history), max_output_tokens=max_output_tokens)
         data = self._parse_json(result, raw_response)
         return Reflection(
             original_response=raw_response,

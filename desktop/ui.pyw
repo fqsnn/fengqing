@@ -158,6 +158,11 @@ class FengqingApp:
             return code
         visible = result["visible_progress"]
         lines = [str(visible.get("summary", "")), f"下一步：{visible.get('next', '')}"]
+        resource = visible.get("resource_balance", {})
+        if isinstance(resource, dict):
+            reasons = resource.get("reasons", [])
+            reason_text = "；".join(str(item) for item in reasons) if isinstance(reasons, list) else ""
+            lines.append(f"资源均衡：{resource.get('mode', 'unknown')} {reason_text}".rstrip())
         for item in visible.get("steps", []) if isinstance(visible.get("steps"), list) else []:
             if isinstance(item, dict):
                 lines.append(f"- {item.get('action')} / {item.get('status')}: {item.get('evidence')}")

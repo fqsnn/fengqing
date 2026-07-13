@@ -48,6 +48,7 @@ print("compiled", len(files))
     }
     Invoke-Checked -Tool $python -ToolArgs @("-m", "tools.smoke_test")
     Invoke-Checked -Tool $python -ToolArgs @("-m", "tools.state_test")
+    Invoke-Checked -Tool $python -ToolArgs @("-m", "tools.resource_balance_test")
   } finally {
     Pop-Location
   }
