@@ -6,11 +6,20 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from dotenv import dotenv_values
+
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 PYTHON = ROOT / ".venv" / "Scripts" / "python.exe"
-HOST = os.getenv("APP_OPEN_HOST", ".".join(("127", "0", "0", "1")))
-PORT = os.getenv("APP_PORT", "8000")
+LOCAL_SETTINGS = dotenv_values(BACKEND / ".env.local")
+
+
+def _setting(name: str, default: str) -> str:
+    return os.getenv(name) or str(LOCAL_SETTINGS.get(name) or default)
+
+
+HOST = _setting("APP_OPEN_HOST", ".".join(("127", "0", "0", "1")))
+PORT = _setting("APP_PORT", "8000")
 BASE_URL = f"{'http'}://{HOST}:{PORT}"
 
 

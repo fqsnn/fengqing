@@ -22,6 +22,12 @@ class AgentRunnerPort(ABC):
         raise NotImplementedError
 
 
+class PythonExampleRunnerPort(ABC):
+    @abstractmethod
+    async def run_heart(self) -> JsonMap:
+        raise NotImplementedError
+
+
 class ShortTermMemoryPort(ABC):
     @abstractmethod
     async def save(self, session_id: str, conversation: Conversation) -> None:

@@ -2,7 +2,7 @@ from .entities import Conversation, Reflection
 from .agent_gateway import agent_intent, delegated_instruction, delegated_reply
 from .conversation_style import natural_reply, polish_reply
 from .dual_loop import DUAL_LOOP_SYSTEM, format_search_context, needs_web_search
-from .ports import AgentRunnerPort, ContextRecallPort, EventStorePort, EvolutionEnginePort, LLMEnginePort, ReflectionEnginePort, ShortTermMemoryPort, WebSearchPort
+from .ports import AgentRunnerPort, ContextRecallPort, EventStorePort, EvolutionEnginePort, LLMEnginePort, PythonExampleRunnerPort, ReflectionEnginePort, ShortTermMemoryPort, WebSearchPort
 from .prompts import DEFAULT_SYSTEM_PROMPT
 from .quick_replies import quick_reply
 from .shared_context import SharedContext
@@ -16,6 +16,7 @@ class AICoreService:
         reflection: ReflectionEnginePort,
         evolution: EvolutionEnginePort,
         event_store: EventStorePort,
+        python_runner: PythonExampleRunnerPort,
         system_prompt: str = DEFAULT_SYSTEM_PROMPT,
         shared_context: SharedContext | None = None,
         web_search: WebSearchPort | None = None,
@@ -28,6 +29,7 @@ class AICoreService:
         self.reflection = reflection
         self.evolution = evolution
         self.event_store = event_store
+        self.python_runner = python_runner
         self.system_prompt = system_prompt
         self.shared_context = shared_context
         self.web_search = web_search
@@ -64,15 +66,32 @@ class AICoreService:
 
     async def _fast_reply(self, session_id: str, conv: Conversation, user_input: str) -> str:
         if needs_web_search(user_input):
-            return ""
+            return await self._web_reply(session_id, conv, user_input)
         recalled = self.context_recall.recall(user_input) if self.context_recall else None
-        replies = (("PRIVATE_RECALL", recalled), ("NATURAL_REPLY", natural_reply(user_input, conv)), ("FAST_REPLY", quick_reply(user_input)))
+        fast = await quick_reply(user_input, self.python_runner)
+        replies = (("PRIVATE_RECALL", recalled), ("NATURAL_REPLY", natural_reply(user_input, conv)), ("FAST_REPLY", fast))
         for event_type, reply in replies:
             if reply:
                 await self._save_answer(session_id, conv, user_input, reply)
                 await self.event_store.append_event(session_id, event_type, {"reply": reply})
                 return reply
         return ""
+
+    async def _web_reply(self, session_id: str, conv: Conversation, user_input: str) -> str:
+        if not self.web_search:
+            reply = "联网检索未启用，当前不会假装已经联网。"
+            await self._save_answer(session_id, conv, user_input, reply)
+            return reply
+        try:
+            results = await self.web_search.search(user_input)
+        except Exception as exc:
+            reply = f"联网检索失败：{exc}。"
+            await self.event_store.append_event(session_id, "WEB_SEARCH_FAILED", {"error": str(exc)})
+        else:
+            reply = "已联网检索（仅发送本次检索词）：\n" + (format_search_context(results) or "没有找到结果。")
+            await self.event_store.append_event(session_id, "WEB_SEARCH", {"query": user_input, "results": results})
+        await self._save_answer(session_id, conv, user_input, reply)
+        return reply
 
     async def _model_reply(self, session_id: str, conv: Conversation, user_input: str) -> str:
         raw = await self._draft(session_id, conv, user_input)
@@ -89,11 +108,9 @@ class AICoreService:
         await self._save_answer(session_id, conv, user_input, reply)
         return reply
 
-    def _llm_messages(self, conv: Conversation, web_context: str, private_context: str) -> list[dict[str, str]]:
+    def _llm_messages(self, conv: Conversation, private_context: str) -> list[dict[str, str]]:
         messages = conv.to_llm_format()
         messages.insert(1, {"role": "system", "content": DUAL_LOOP_SYSTEM})
-        if web_context:
-            messages.insert(2, {"role": "system", "content": web_context})
         if private_context:
             messages.insert(1, {"role": "system", "content": f"本机私人记忆中与本轮相关的原话：\n{private_context}"})
         if self.shared_context:
@@ -103,26 +120,14 @@ class AICoreService:
         return messages
 
     async def _draft(self, session_id: str, conv: Conversation, user_input: str) -> str:
-        web_context = await self._web_context(session_id, user_input)
         private_context = self._private_context(user_input)
-        await self.event_store.append_event(session_id, "DUAL_LOOP", {"mode": "forward_reverse_prompt", "web": bool(web_context)})
-        return await self.llm.generate_response(self._llm_messages(conv, web_context, private_context))
+        await self.event_store.append_event(session_id, "DUAL_LOOP", {"mode": "forward_reverse_prompt", "web": False})
+        return await self.llm.generate_response(self._llm_messages(conv, private_context))
 
     def _private_context(self, user_input: str) -> str:
         if not self.allow_private_model_context or not self.context_recall:
             return ""
         return self.context_recall.relevant(user_input)
-
-    async def _web_context(self, session_id: str, user_input: str) -> str:
-        if not self.web_search or not needs_web_search(user_input):
-            return ""
-        try:
-            results = await self.web_search.search(user_input)
-        except Exception as exc:
-            await self.event_store.append_event(session_id, "WEB_SEARCH_FAILED", {"error": str(exc)})
-            return "联网检索失败；必须诚实说明无法确认外部事实。"
-        await self.event_store.append_event(session_id, "WEB_SEARCH", {"query": user_input, "results": results})
-        return format_search_context(results)
 
     async def _conversation(self, session_id: str) -> Conversation:
         conv = await self.memory.load(session_id) or Conversation(session_id=session_id)

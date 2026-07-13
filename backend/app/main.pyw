@@ -20,6 +20,7 @@ from .infrastructure.evolution_adapter import EvolutionEngine
 from .infrastructure.llm_adapter import build_llm_adapter
 from .infrastructure.memory_adapter import InMemoryMemoryAdapter
 from .infrastructure.private_memory import MarkdownContextRecall, MarkdownMemoryAdmin
+from .infrastructure.python_example_runner import LocalPythonExampleRunner
 from .infrastructure.reflection_adapter import SelfReflectionEngine
 from .infrastructure.task_ledger import JsonlTaskLedger
 from .infrastructure.web_search_adapter import build_web_search_adapter
@@ -46,11 +47,12 @@ shared_context = SharedContext(limit=8)
 web_search = build_web_search_adapter()
 context_recall = MarkdownContextRecall(PRIVATE_CONTEXT_DIR, WORKSPACE_CONTEXT_DIR)
 memory_admin = MarkdownMemoryAdmin(PRIVATE_CONTEXT_DIR, activity_history)
+python_runner = LocalPythonExampleRunner()
 code_agent = CodeAgent(llm, BASE_DIR)
-orchestrator = HybridOrchestrator(llm, code_agent, shared_context=shared_context, history=activity_history, tasks=task_ledger)
+orchestrator = HybridOrchestrator(llm, code_agent, python_runner, web_search=web_search, shared_context=shared_context, history=activity_history, tasks=task_ledger)
 
 service = AICoreService(
-    llm, memory, reflection, evolution, event_store, system_prompt=SYSTEM_PROMPT,
+    llm, memory, reflection, evolution, event_store, python_runner, system_prompt=SYSTEM_PROMPT,
     shared_context=shared_context, web_search=web_search, context_recall=context_recall,
     agent_runner=orchestrator, allow_private_model_context=PRIVATE_MODEL_ENABLED
 )

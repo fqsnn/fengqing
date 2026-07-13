@@ -23,7 +23,7 @@ def _step(item: JsonMap) -> JsonMap:
 def _status(result: object) -> str:
     if not isinstance(result, dict):
         return "done"
-    if result.get("error"):
+    if "error" in result:
         return "failed"
     if result.get("passed") is False or result.get("rolled_back"):
         return "needs_attention"

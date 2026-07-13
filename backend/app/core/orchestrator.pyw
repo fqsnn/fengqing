@@ -4,17 +4,21 @@ from .agent import CodeAgent
 from .agent_progress import summarize_agent_progress
 from .agent_replies import EXPLAINERS
 from .command_runner import run_quality_commands
+from .dual_loop import format_search_context
 from .evolution_flow import controlled_self_evolution
 from .planner import ACTIONS, direct_plan, parse_plan
-from .ports import ActivityHistoryPort, AgentRunnerPort, JsonMap, LLMEnginePort, TaskLedgerPort
+from .ports import ActivityHistoryPort, AgentRunnerPort, JsonMap, LLMEnginePort, PythonExampleRunnerPort, TaskLedgerPort, WebSearchPort
+from .python_examples import heart_reply
 from .self_programming import self_program_once
 from .shared_context import SharedContext
 
 
 class HybridOrchestrator(AgentRunnerPort):
-    def __init__(self, llm: LLMEnginePort, code_agent: CodeAgent, shared_context: SharedContext | None = None, history: ActivityHistoryPort | None = None, tasks: TaskLedgerPort | None = None) -> None:
+    def __init__(self, llm: LLMEnginePort, code_agent: CodeAgent, python_runner: PythonExampleRunnerPort, web_search: WebSearchPort | None = None, shared_context: SharedContext | None = None, history: ActivityHistoryPort | None = None, tasks: TaskLedgerPort | None = None) -> None:
         self.llm = llm
         self.code_agent = code_agent
+        self.python_runner = python_runner
+        self.web_search = web_search
         self.shared_context = shared_context
         self.history = history
         self.tasks = tasks
@@ -22,7 +26,7 @@ class HybridOrchestrator(AgentRunnerPort):
             "analyze_code": self._analyze_code, "review_code": self._review_code,
             "improve_code": self._improve_code, "read_file": self._read_file,
             "run_tests": self._run_tests, "run_quality_commands": self._run_quality_commands,
-            "web_search": self._web_search,
+            "web_search": self._web_search, "generate_python_heart": self._run_python_heart,
         }
 
     async def execute(self, instruction: str, allow_write: bool = False) -> JsonMap:
@@ -43,7 +47,7 @@ class HybridOrchestrator(AgentRunnerPort):
         try:
             return await self._run_step(step, allow_write)
         except Exception as exc:
-            return {"error": str(exc), "action": str(step.get("action", "unknown"))}
+            return {"error": f"{type(exc).__name__}: {exc}", "action": str(step.get("action", "unknown"))}
 
     async def _start_task(self, instruction: str, plan: list[JsonMap], allow_write: bool) -> JsonMap | None:
         if not self.tasks:
@@ -109,10 +113,7 @@ class HybridOrchestrator(AgentRunnerPort):
             return await self_program_once(self.code_agent, allow_write, str(params.get("instruction", "")), int(params.get("max_files", 1)))
         if action not in self.registry:
             return {"error": f"Unknown action: {action}"}
-        try:
-            return await self.registry[action](**params)
-        except TypeError as exc:
-            return {"error": str(exc), "action": action, "params": params}
+        return await self.registry[action](**params)
 
     def _normalize_params(self, action: str, params: JsonMap) -> JsonMap:
         if action not in {"read_file", "improve_code"} or "path" in params:
@@ -147,8 +148,16 @@ class HybridOrchestrator(AgentRunnerPort):
         return await run_quality_commands()
 
     async def _web_search(self, query: str) -> JsonMap:
-        reply = "\u666e\u901a\u5bf9\u8bdd\u5df2\u63a5\u5165\u53d7\u63a7\u8054\u7f51\uff1b\u667a\u80fd\u4f53\u8054\u7f51\u5de5\u5177\u4f1a\u5728\u72ec\u7acb\u6743\u9650\u5c42\u5f00\u653e\u3002"
-        return {"reply": reply, "query": query}
+        if not self.web_search:
+            return {"reply": "联网检索未启用，当前不会假装已经联网。", "query": query, "passed": False}
+        try:
+            results = await self.web_search.search(query)
+        except Exception as exc:
+            return {"reply": f"联网检索失败：{exc}。", "query": query, "error": str(exc), "passed": False}
+        return {"reply": _web_reply(results), "query": query, "results": results, "passed": True}
+
+    async def _run_python_heart(self) -> JsonMap:
+        return heart_reply(await self.python_runner.run_heart())
 
 
 def _output(plan: list[JsonMap], results: list[JsonMap], allow_write: bool) -> JsonMap:
@@ -175,3 +184,7 @@ def _accepts_plan(instruction: str, plan: list[JsonMap]) -> bool:
 
 def _scope_step(instruction: str) -> list[JsonMap]:
     return [{"id": "clarify", "action": "explain_agent_scope", "params": {"instruction": instruction}}]
+
+
+def _web_reply(results: list[JsonMap]) -> str:
+    return "已联网检索，但没有找到结果。" if not results else "已联网检索：\n" + format_search_context(results)

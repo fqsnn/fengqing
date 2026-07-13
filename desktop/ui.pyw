@@ -165,4 +165,4 @@ def _code_example_reply(result: dict[str, object]) -> str:
     rows = result.get("results", [])
     first = rows[0].get("result", {}) if rows and isinstance(rows[0], dict) else {}
     reply = first.get("reply") if isinstance(first, dict) else None
-    return reply if isinstance(reply, str) and first.get("mode") == "code_example" else ""
+    return reply if isinstance(reply, str) and first.get("mode") in {"code_example", "executed_python_example"} else ""

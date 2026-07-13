@@ -1,6 +1,7 @@
 import json
 import re
 
+from .dual_loop import needs_web_search
 from .ports import JsonMap
 
 ACTIONS = (
@@ -65,13 +66,17 @@ SPECIAL_RULES = (
 
 def direct_plan(instruction: str) -> list[JsonMap]:
     text = instruction.lower()
-    return _example_plan(text) or _ui_change_plan(text) or _ai_creation_plan(text) or _computer_control_plan(text) or _project_push_plan(instruction, text) or _mobile_plan(instruction, text) or _evolve_plan(instruction) or _special_plan(text) or _code_plan(instruction)
+    return _example_plan(text) or _web_plan(instruction) or _ui_change_plan(text) or _ai_creation_plan(text) or _computer_control_plan(text) or _project_push_plan(instruction, text) or _mobile_plan(instruction, text) or _evolve_plan(instruction) or _special_plan(text) or _code_plan(instruction)
 
 
 def _example_plan(text: str) -> list[JsonMap]:
     if "python" in text and _has(text, HEART_WORDS):
         return [_step("python_heart", "generate_python_heart")]
     return []
+
+
+def _web_plan(instruction: str) -> list[JsonMap]:
+    return [_step("web_search", "web_search", {"query": instruction})] if needs_web_search(instruction) else []
 
 
 def _project_push_plan(instruction: str, text: str) -> list[JsonMap]:

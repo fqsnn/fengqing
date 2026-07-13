@@ -20,5 +20,6 @@ def _capabilities() -> JsonMap:
         "private_memory": True,
         "workspace_sync": bool(os.getenv("WORKSPACE_CONTEXT_DIR", "").strip()),
         "dual_loop": True,
+        "python_execution": True,
         "web_search": os.getenv("WEB_SEARCH_ENABLED", "false").lower().strip() == "true",
     }

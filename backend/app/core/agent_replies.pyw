@@ -8,22 +8,6 @@ from .progress_ledger import progress_reply
 
 Explainer = Callable[..., JsonMap]
 
-PYTHON_HEART_CODE = """```python
-def heart(size: int = 12) -> None:
-    for y in range(size, -size, -1):
-        line: list[str] = []
-        for x in range(-2 * size, 2 * size + 1):
-            horizontal, vertical = x / size, y / size
-            inside = (horizontal ** 2 + vertical ** 2 - 1) ** 3 - horizontal ** 2 * vertical ** 3 <= 0
-            line.append("*" if inside else " ")
-        print("".join(line).rstrip())
-
-
-heart()
-```
-
-这是一段终端爱心示例，只生成给你看，不会修改项目文件，也不会触发写入。"""
-
 TIERS: list[JsonMap] = [
     {"tier": "rule", "use": "固定能力和安全边界", "target_ms": 50},
     {"tier": "local_fast", "use": "短问答和轻推理", "target_ms": 1200},
@@ -154,10 +138,6 @@ def agent_scope_reply(instruction: str = "") -> JsonMap:
     return _reply(text, mode="clarify_agent_scope", instruction=instruction, writes_project=False)
 
 
-def python_heart_reply() -> JsonMap:
-    return _reply(PYTHON_HEART_CODE, mode="code_example", writes_project=False)
-
-
 def _fixed(key: str) -> Explainer:
     def explain(**overrides: object) -> JsonMap:
         data = dict(REPLIES[key])
@@ -174,7 +154,6 @@ def _reply(reply: str, **extra: object) -> JsonMap:
 
 
 EXPLAINERS: dict[str, Explainer] = {
-    "generate_python_heart": python_heart_reply,
     "explain_ui_change": ui_change_reply,
     "explain_ai_creation": ai_creation_reply,
     "explain_computer_control": computer_control_reply,
