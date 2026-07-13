@@ -16,6 +16,12 @@ class LLMEnginePort(ABC):
         raise NotImplementedError
 
 
+class AgentRunnerPort(ABC):
+    @abstractmethod
+    async def execute(self, instruction: str, allow_write: bool = False) -> JsonMap:
+        raise NotImplementedError
+
+
 class ShortTermMemoryPort(ABC):
     @abstractmethod
     async def save(self, session_id: str, conversation: Conversation) -> None:
@@ -47,6 +53,38 @@ class WebSearchPort(ABC):
 class ContextRecallPort(ABC):
     @abstractmethod
     def recall(self, query: str) -> str | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def relevant(self, query: str) -> str:
+        raise NotImplementedError
+
+
+class ActivityHistoryPort(ABC):
+    @abstractmethod
+    async def append(self, kind: str, data: JsonMap) -> JsonMap:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_events(self, kind: str | None = None, limit: int = 20) -> list[JsonMap]:
+        raise NotImplementedError
+
+
+class MemoryAdminPort(ABC):
+    @abstractmethod
+    async def list_facts(self) -> list[JsonMap]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def add(self, text: str) -> JsonMap:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def update(self, memory_id: str, text: str) -> JsonMap | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def delete(self, memory_id: str) -> JsonMap | None:
         raise NotImplementedError
 
 

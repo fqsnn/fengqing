@@ -14,17 +14,36 @@ class LocalContextRecall(ContextRecallPort):
     def recall(self, query: str) -> str | None:
         if not _is_query(query):
             return None
-        ranked = sorted(((_score(query, fact), fact) for fact in self.facts), reverse=True)
+        ranked = _rank(query, self.facts)
         if not ranked or ranked[0][0] < MIN_SCORE:
             return None
         if len(ranked) > 1 and ranked[0][0] == ranked[1][0]:
             return None
         return _answer(ranked[0][1])
 
+    def relevant(self, query: str) -> str:
+        matches = [fact for score, fact in _rank(query, self.facts) if score >= MIN_SCORE][:3]
+        return "\n".join(f"- {fact}" for fact in matches)
+
 
 def _facts(context: str) -> list[str]:
-    lines = (line.strip() for line in context.splitlines())
-    return [_clean(line[2:]) for line in lines if line.startswith(("- “", '- "'))]
+    facts: list[str] = []
+    in_code = False
+    for line in context.splitlines():
+        if line.strip().startswith("```"):
+            in_code = not in_code
+        elif not in_code and (fact := _fact_line(line)):
+            facts.append(fact)
+    return list(dict.fromkeys(facts))
+
+
+def _fact_line(line: str) -> str | None:
+    value = line.strip()
+    if not value or value.startswith(("#", "|", "---")):
+        return None
+    value = re.sub(r"^(?:[-*+>]|\d+[.)])\s*", "", value)
+    clean = _clean(value)
+    return clean if len(clean) >= 4 else None
 
 
 def _clean(text: str) -> str:
@@ -49,6 +68,10 @@ def _ngrams(text: str, size: int) -> set[str]:
 def _score(query: str, fact: str) -> int:
     query_text, fact_text = _normalize(query), _normalize(fact)
     return len(_ngrams(query_text, 2) & _ngrams(fact_text, 2)) + 2 * len(_ngrams(query_text, 3) & _ngrams(fact_text, 3))
+
+
+def _rank(query: str, facts: list[str]) -> list[tuple[int, str]]:
+    return sorted(((_score(query, fact), fact) for fact in facts), reverse=True)
 
 
 def _answer(fact: str) -> str:

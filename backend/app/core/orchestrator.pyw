@@ -6,16 +6,17 @@ from .agent_replies import EXPLAINERS
 from .command_runner import run_quality_commands
 from .evolution_flow import controlled_self_evolution
 from .planner import ACTIONS, direct_plan, parse_plan
-from .ports import JsonMap, LLMEnginePort
+from .ports import ActivityHistoryPort, AgentRunnerPort, JsonMap, LLMEnginePort
 from .self_programming import self_program_once
 from .shared_context import SharedContext
 
 
-class HybridOrchestrator:
-    def __init__(self, llm: LLMEnginePort, code_agent: CodeAgent, shared_context: SharedContext | None = None) -> None:
+class HybridOrchestrator(AgentRunnerPort):
+    def __init__(self, llm: LLMEnginePort, code_agent: CodeAgent, shared_context: SharedContext | None = None, history: ActivityHistoryPort | None = None) -> None:
         self.llm = llm
         self.code_agent = code_agent
         self.shared_context = shared_context
+        self.history = history
         self.registry: dict[str, Callable[..., Awaitable[object]]] = {
             "analyze_code": self._analyze_code, "review_code": self._review_code,
             "improve_code": self._improve_code, "read_file": self._read_file,
@@ -28,6 +29,9 @@ class HybridOrchestrator:
         results = [{"step": step, "result": await self._run_step(step, allow_write)} for step in plan]
         output = {"plan": plan, "results": results, "allow_write": allow_write}
         output["visible_progress"] = summarize_agent_progress(plan, results, allow_write)
+        if self.history:
+            event = await self.history.append("agent_run", {"instruction": instruction, "progress": output["visible_progress"]})
+            output["history_id"] = event.get("id", "")
         if self.shared_context:
             self.shared_context.add("agent", self._summary(instruction, output))
         return output

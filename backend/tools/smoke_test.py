@@ -26,7 +26,7 @@ def _core_behavior_works() -> bool:
 def main() -> int:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     client = TestClient(app)
-    for path in ("/", "/health", "/api/v1/status"):
+    for path in ("/", "/health", "/api/v1/status", "/api/v1/history?limit=1", "/api/v1/memories"):
         response = client.get(path)
         if response.status_code != 200:
             print(f"smoke failed: {path} -> {response.status_code}")

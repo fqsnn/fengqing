@@ -6,6 +6,7 @@ from ..core.ports import JsonMap
 class ChatRequest(BaseModel):
     session_id: str
     message: str
+    allow_agent_write: bool = False
 
 
 class ChatResponse(BaseModel):
@@ -22,3 +23,7 @@ class AgentRequest(BaseModel):
 class AgentResponse(BaseModel):
     result: JsonMap
     status: str = "success"
+
+
+class MemoryRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=1000)

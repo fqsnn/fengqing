@@ -1,7 +1,8 @@
 from .entities import Conversation, Reflection
+from .agent_gateway import agent_intent, delegated_instruction, delegated_reply
 from .conversation_style import natural_reply, polish_reply
 from .dual_loop import DUAL_LOOP_SYSTEM, format_search_context, needs_web_search
-from .ports import ContextRecallPort, EventStorePort, EvolutionEnginePort, LLMEnginePort, ReflectionEnginePort, ShortTermMemoryPort, WebSearchPort
+from .ports import AgentRunnerPort, ContextRecallPort, EventStorePort, EvolutionEnginePort, LLMEnginePort, ReflectionEnginePort, ShortTermMemoryPort, WebSearchPort
 from .prompts import DEFAULT_SYSTEM_PROMPT
 from .quick_replies import quick_reply
 from .shared_context import SharedContext
@@ -19,6 +20,8 @@ class AICoreService:
         shared_context: SharedContext | None = None,
         web_search: WebSearchPort | None = None,
         context_recall: ContextRecallPort | None = None,
+        agent_runner: AgentRunnerPort | None = None,
+        allow_private_model_context: bool = True,
     ) -> None:
         self.llm = llm
         self.memory = memory
@@ -29,13 +32,18 @@ class AICoreService:
         self.shared_context = shared_context
         self.web_search = web_search
         self.context_recall = context_recall
+        self.agent_runner = agent_runner
+        self.allow_private_model_context = allow_private_model_context
         self._reflection_buffer: list[Reflection] = []
         self.evolution_window = 3
         self.evolution_threshold = 0.7
 
-    async def process_user_input(self, session_id: str, user_input: str) -> str:
+    async def process_user_input(self, session_id: str, user_input: str, allow_agent_write: bool = False) -> str:
         conv = await self._conversation(session_id)
         conv.add_message("user", user_input)
+        delegated = await self._agent_reply(session_id, conv, user_input, allow_agent_write)
+        if delegated:
+            return delegated
         fast = await self._fast_reply(session_id, conv, user_input)
         if fast:
             return fast
@@ -43,6 +51,16 @@ class AICoreService:
             return await self._model_reply(session_id, conv, user_input)
         except Exception as exc:
             return await self._llm_failure(session_id, conv, user_input, exc)
+
+    async def _agent_reply(self, session_id: str, conv: Conversation, user_input: str, allow_write: bool) -> str:
+        intent = agent_intent(user_input)
+        if not intent or not self.agent_runner:
+            return ""
+        result = await self.agent_runner.execute(delegated_instruction(user_input, intent), allow_write=allow_write)
+        reply = delegated_reply(result, allow_write)
+        await self._save_answer(session_id, conv, user_input, reply)
+        await self.event_store.append_event(session_id, "AGENT_DELEGATED", {"intent": intent, "allow_write": allow_write})
+        return reply
 
     async def _fast_reply(self, session_id: str, conv: Conversation, user_input: str) -> str:
         if needs_web_search(user_input):
@@ -71,11 +89,13 @@ class AICoreService:
         await self._save_answer(session_id, conv, user_input, reply)
         return reply
 
-    def _llm_messages(self, conv: Conversation, web_context: str) -> list[dict[str, str]]:
+    def _llm_messages(self, conv: Conversation, web_context: str, private_context: str) -> list[dict[str, str]]:
         messages = conv.to_llm_format()
         messages.insert(1, {"role": "system", "content": DUAL_LOOP_SYSTEM})
         if web_context:
             messages.insert(2, {"role": "system", "content": web_context})
+        if private_context:
+            messages.insert(1, {"role": "system", "content": f"本机私人记忆中与本轮相关的原话：\n{private_context}"})
         if self.shared_context:
             context = self.shared_context.render()
             if context:
@@ -84,8 +104,14 @@ class AICoreService:
 
     async def _draft(self, session_id: str, conv: Conversation, user_input: str) -> str:
         web_context = await self._web_context(session_id, user_input)
+        private_context = self._private_context(user_input)
         await self.event_store.append_event(session_id, "DUAL_LOOP", {"mode": "forward_reverse_prompt", "web": bool(web_context)})
-        return await self.llm.generate_response(self._llm_messages(conv, web_context))
+        return await self.llm.generate_response(self._llm_messages(conv, web_context, private_context))
+
+    def _private_context(self, user_input: str) -> str:
+        if not self.allow_private_model_context or not self.context_recall:
+            return ""
+        return self.context_recall.relevant(user_input)
 
     async def _web_context(self, session_id: str, user_input: str) -> str:
         if not self.web_search or not needs_web_search(user_input):

@@ -3,6 +3,7 @@ import time
 from tkinter import BooleanVar, Button, Checkbutton, Entry, Frame, Label, Tk, Text, END, WORD
 
 from backend_bridge import request
+from memory_window import MemoryWindow
 from sky_theme import BLUE, CARD, INK, MUTED, SKY, SkyHeader
 
 SESSION = f"desktop_{int(time.time())}"
@@ -12,12 +13,17 @@ class FengqingApp:
     def __init__(self) -> None:
         self.root = Tk()
         self.root.title("风轻思念浓")
-        self.root.geometry("980x720")
+        self._fit_window()
         self.mode = "chat"
         self.allow_write = BooleanVar(value=False)
         self._build()
         self._status()
-        self._say("风轻思念浓", "我在。现在推进会显示出来，不再只藏在代码里。")
+        self._say("风轻思念浓", "我在。对话里需要检查、测试或推进项目时，我会受控调用自己的智能体。")
+
+    def _fit_window(self) -> None:
+        self.root.geometry("900x620+40+40")
+        self.root.minsize(720, 520)
+        self.root.state("zoomed")
 
     def run(self) -> None:
         self.root.mainloop()
@@ -27,16 +33,16 @@ class FengqingApp:
         SkyHeader(self.root).pack(fill="x")
         self.status = Label(self.root, text="检查中", bg=SKY, fg=MUTED, font=("Segoe UI", 10))
         self.status.pack(anchor="e", padx=18, pady=(0, 4))
+        self._bottom()
+        self._tools()
         self.body = Text(self.root, wrap=WORD, bg=CARD, fg=INK, relief="flat", padx=22, pady=18)
         self.body.pack(fill="both", expand=True)
         self.body.tag_configure("who", foreground=BLUE, spacing1=10, font=("Segoe UI", 10, "bold"))
         self.body.tag_configure("line", foreground=INK, spacing3=12, font=("Segoe UI", 11))
-        self._bottom()
-        self._tools()
 
     def _bottom(self) -> None:
         self.bottom = Frame(self.root, bg=SKY, padx=16, pady=12)
-        self.bottom.pack(fill="x")
+        self.bottom.pack(side="bottom", fill="x")
         self.entry = Entry(self.bottom, relief="flat", bg=CARD, fg=INK, font=("Segoe UI", 12))
         self.entry.pack(side="left", fill="x", expand=True, ipady=12)
         self.entry.bind("<Return>", lambda _event: self._submit())
@@ -44,10 +50,12 @@ class FengqingApp:
 
     def _tools(self) -> None:
         self.tools = Frame(self.root, bg=SKY, padx=12, pady=8)
-        self.tools.pack(fill="x")
+        self.tools.pack(side="bottom", fill="x")
         Button(self.tools, text="对话", command=lambda: self._mode("chat"), bg=CARD, fg=INK, relief="flat").pack(side="left")
         Button(self.tools, text="智能体", command=lambda: self._mode("agent"), bg=CARD, fg=INK, relief="flat").pack(side="left", padx=8)
         Button(self.tools, text="进度", command=self._show_progress, bg=CARD, fg=INK, relief="flat").pack(side="left", padx=4)
+        Button(self.tools, text="记忆", command=lambda: MemoryWindow(self.root, request), bg=CARD, fg=INK, relief="flat").pack(side="left", padx=4)
+        Button(self.tools, text="历史", command=self._show_history, bg=CARD, fg=INK, relief="flat").pack(side="left", padx=4)
         Checkbutton(self.tools, text="允许写入", variable=self.allow_write, bg=SKY, fg=MUTED).pack(side="left", padx=4)
 
     def _status(self) -> None:
@@ -58,6 +66,18 @@ class FengqingApp:
     def _show_progress(self) -> None:
         data = request("GET", "/api/v1/progress") or {}
         self._say("进度", self._progress_text(data))
+
+    def _show_history(self) -> None:
+        data = request("GET", "/api/v1/history?limit=12") or {}
+        items = data.get("items", []) if isinstance(data.get("items"), list) else []
+        text = "\n".join(self._history_line(item) for item in items if isinstance(item, dict))
+        self._say("历史", text or "还没有智能体执行或记忆变更记录。")
+
+    def _history_line(self, item: dict[str, object]) -> str:
+        labels = {"agent_run": "智能体", "memory_added": "新增记忆", "memory_updated": "修改记忆", "memory_deleted": "删除记忆"}
+        data = item.get("data", {}) if isinstance(item.get("data"), dict) else {}
+        detail = data.get("instruction") or _memory_detail(data)
+        return f"{item.get('time', '')}  {labels.get(str(item.get('kind')), str(item.get('kind')))}：{detail}"
 
     def _progress_text(self, data: dict[str, object]) -> str:
         rows = [str(data.get("reply", "暂无进度"))]
@@ -78,13 +98,16 @@ class FengqingApp:
             threading.Thread(target=self._send, args=(text,), daemon=True).start()
 
     def _send(self, text: str) -> None:
-        payload = self._agent_payload(text) if self.mode == "agent" else {"session_id": SESSION, "message": text}
+        payload = self._agent_payload(text) if self.mode == "agent" else self._chat_payload(text)
         data = request("POST", "/api/v1/agent" if self.mode == "agent" else "/api/v1/chat", payload)
         reply = self._agent_text(data) if self.mode == "agent" else str((data or {}).get("reply", "连接中断。"))
         self.root.after(0, lambda: self._say("风轻思念浓", reply))
 
     def _agent_payload(self, text: str) -> dict[str, object]:
         return {"instruction": text, "allow_write": self.allow_write.get()}
+
+    def _chat_payload(self, text: str) -> dict[str, object]:
+        return {"session_id": SESSION, "message": text, "allow_agent_write": self.allow_write.get()}
 
     def _agent_text(self, data: dict[str, object] | None) -> str:
         result = (data or {}).get("result", {})
@@ -114,3 +137,8 @@ class FengqingApp:
         self.body.insert(END, f"{who}\n", "who")
         self.body.insert(END, f"{text}\n\n", "line")
         self.body.see(END)
+
+
+def _memory_detail(data: dict[str, object]) -> str:
+    item = data.get("memory") or data.get("after") or data.get("before") or {}
+    return str(item.get("text", "")) if isinstance(item, dict) else ""

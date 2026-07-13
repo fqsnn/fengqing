@@ -47,6 +47,7 @@ print("compiled", len(files))
       throw "python compile check failed"
     }
     Invoke-Checked -Tool $python -ToolArgs @("-m", "tools.smoke_test")
+    Invoke-Checked -Tool $python -ToolArgs @("-m", "tools.state_test")
   } finally {
     Pop-Location
   }
@@ -79,7 +80,7 @@ function New-PublishTree {
 
 function Assert-CleanBranch {
   $privateName = [string]([char]0x8BB8) + [string]([char]0x53EF) + [string]([char]0x5FC3)
-  $filePattern = "workspace|(^|/)\.env$|venv|event_logs|\.exe$|\.dll$|\.pak$|\.bin$|\.dat$|resources/|locales/|LICENSE1|__pycache__|\.pyc$|front" + "end|index\.html|app\.js|styles\.css"
+  $filePattern = "(^|/)workspace(/|$)|(^|/)\.env$|venv|event_logs|\.exe$|\.dll$|\.pak$|\.bin$|\.dat$|resources/|locales/|LICENSE1|__pycache__|\.pyc$|front" + "end|index\.html|app\.js|styles\.css"
   $badFiles = & git ls-tree -r --name-only publish-clean | Select-String -Pattern $filePattern
   if ($badFiles) {
     throw "blocked publish files: $($badFiles -join '; ')"
