@@ -8,6 +8,7 @@ from app.core.agent_gateway import agent_intent, delegated_instruction
 from app.core.agent_progress import summarize_agent_progress
 from app.core.orchestrator import _accepts_plan, _web_reply
 from app.core.planner import direct_plan
+from app.core.dual_loop import needs_web_search
 from app.core.python_examples import heart_reply
 from app.core.quick_replies import quick_reply
 from app.infrastructure.activity_history import JsonlActivityHistory
@@ -81,6 +82,11 @@ def _web_route() -> bool:
     plan = direct_plan("联网搜索南京天气")
     reply = _web_reply([{"title": "天气", "url": "example.test", "snippet": "晴"}])
     return bool(plan) and plan[0]["action"] == "web_search" and "example.test" in reply
+
+
+def _resource_scheduler_route() -> bool:
+    plan = direct_plan("实时调度资源分配")
+    return bool(plan) and plan[0]["action"] == "explain_resource_scheduler" and not needs_web_search("实时调度资源分配")
 
 
 def _empty_error_fails() -> bool:
@@ -172,7 +178,7 @@ async def _exercise(root: Path) -> bool:
 
 def _checks() -> bool:
     return all((
-        asyncio.run(_quick_routes()), _project_push_route(), _web_route(), _empty_error_fails(),
+        asyncio.run(_quick_routes()), _project_push_route(), _web_route(), _resource_scheduler_route(), _empty_error_fails(),
         _visual_progress_is_honest(), _restored_write_needs_attention(), _runtime_probe_states(),
         agent_intent("写一段 Python 爱心代码") is None, agent_intent("修改项目代码") == "write",
         agent_intent("请运行测试") == "read", delegated_instruction("继续推进AI项目", "write").startswith("自己编程自己"),
